@@ -5,7 +5,7 @@ import SwiftUI
 
 /// Das Dokumentfenster: Seitenleiste (SwiftUI) und `PDFView`, dazu Werkzeugleiste und Menüaktionen.
 final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSSearchFieldDelegate,
-    NSMenuItemValidation, DocumentActions, PDFViewZoom {
+    NSMenuItemValidation, NSToolbarItemValidation, DocumentActions, PDFViewZoom, PageCommands {
     private let model: DocumentViewModel
     private let pdfView = PDFView()
     private let splitViewController = NSSplitViewController()
@@ -32,6 +32,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
 
         working.onChange = { [weak self] in self?.model.previewDidChange() }
         model.pdfView = pdfView
+        model.commands = self
         shouldCascadeWindows = true
     }
 
@@ -84,6 +85,11 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         static let zoomIn = NSToolbarItem.Identifier("zoomIn")
         static let twoPages = NSToolbarItem.Identifier("twoPages")
         static let search = NSToolbarItem.Identifier("search")
+        static let rotateLeft = NSToolbarItem.Identifier("rotateLeft")
+        static let rotateRight = NSToolbarItem.Identifier("rotateRight")
+        static let insert = NSToolbarItem.Identifier("insert")
+        static let split = NSToolbarItem.Identifier("split")
+        static let save = NSToolbarItem.Identifier("save")
     }
 
     private func configureToolbar() {
@@ -97,8 +103,9 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace, ItemID.zoomOut, ItemID.zoomIn,
-         ItemID.twoPages, .space, ItemID.search]
+        [.toggleSidebar, .sidebarTrackingSeparator, ItemID.rotateLeft, ItemID.rotateRight, ItemID.insert,
+         ItemID.split, .flexibleSpace, ItemID.zoomOut, ItemID.zoomIn, ItemID.twoPages, .space, ItemID.save,
+         ItemID.search]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -116,6 +123,20 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         case ItemID.twoPages:
             return button(identifier, loc("Zwei Seiten", "Two Pages"), "rectangle.split.2x1",
                           #selector(toggleTwoPages(_:)))
+        case ItemID.rotateLeft:
+            return button(identifier, loc("Nach links drehen", "Rotate Left"), "rotate.left",
+                          #selector(rotateLeft(_:)))
+        case ItemID.rotateRight:
+            return button(identifier, loc("Nach rechts drehen", "Rotate Right"), "rotate.right",
+                          #selector(rotateRight(_:)))
+        case ItemID.insert:
+            return button(identifier, loc("Dateien einfügen", "Insert Files"), "doc.badge.plus",
+                          #selector(insertFiles(_:)))
+        case ItemID.split:
+            return button(identifier, loc("Teilen", "Split"), "scissors", #selector(splitDocument(_:)))
+        case ItemID.save:
+            return button(identifier, loc("Als Kopie sichern", "Save as Copy"), "square.and.arrow.down",
+                          #selector(saveCopy(_:)))
         case ItemID.search:
             let item = NSSearchToolbarItem(itemIdentifier: identifier)
             item.label = loc("Suchen", "Search")
@@ -141,6 +162,15 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         item.action = action
         item.isBordered = true
         return item
+    }
+
+    func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+        switch item.itemIdentifier {
+        case ItemID.zoomIn: return pdfView.canZoomIn
+        case ItemID.zoomOut: return pdfView.canZoomOut
+        case ItemID.rotateLeft, ItemID.rotateRight, ItemID.split, ItemID.save: return !model.pageIDs.isEmpty
+        default: return true
+        }
     }
 
     @objc private func searchFieldChanged(_ sender: NSSearchField) {
@@ -184,8 +214,84 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
     func goToFirstPage(_ sender: Any?) { pdfView.goToFirstPage(sender) }
     func goToLastPage(_ sender: Any?) { pdfView.goToLastPage(sender) }
 
+    // MARK: Seiten-Werkstatt
+
+    private var pdfDocument: PDFToMeDocument? { document as? PDFToMeDocument }
+
+    func rotateLeft(_ sender: Any?) { rotatePages(model.targetPageIDs, by: .threeQuarters) }
+    func rotateRight(_ sender: Any?) { rotatePages(model.targetPageIDs, by: .quarter) }
+
+    /// Entf in der Seitenleiste oder „Bearbeiten → Löschen“.
+    @objc func delete(_ sender: Any?) { deletePages(model.targetPageIDs) }
+
+    func extractSelectedPages(_ sender: Any?) { extractPages(model.targetPageIDs) }
+
+    func insertFiles(_ sender: Any?) {
+        guard let urls = FileImport.chooseFiles() else { return }
+        insertFiles(urls, at: model.insertPosition)
+    }
+
+    func saveCopy(_ sender: Any?) {
+        guard let pdfDocument, let window else { return }
+        SaveFlow.saveCopy(of: pdfDocument, window: window)
+    }
+
+    func splitDocument(_ sender: Any?) {
+        guard let window, let working = pdfDocument?.working else { return }
+        var sheet: NSViewController?
+        let view = SplitSheet(
+            pageCount: working.plan.pages.count, stem: working.stem,
+            onSplit: { parts in
+                if let sheet { window.contentViewController?.dismiss(sheet) }
+                SaveFlow.split(working, into: parts, window: window)
+            },
+            onCancel: { if let sheet { window.contentViewController?.dismiss(sheet) } })
+        let controller = NSHostingController(rootView: view)
+        sheet = controller
+        window.contentViewController?.presentAsSheet(controller)
+    }
+
+    func movePages(_ ids: [PageRef.ID], to position: Int) {
+        pdfDocument?.perform(loc("Seiten verschieben", "Move Pages")) {
+            try $0.change { try $0.move(ids, to: position) }
+        }
+    }
+
+    func insertFiles(_ urls: [URL], at position: Int) {
+        let loaded = FileImport.load(urls, window: window)
+        guard !loaded.isEmpty else { return }
+        let before = model.pageIDs.count
+        pdfDocument?.perform(loc("Dateien einfügen", "Insert Files")) { try $0.insertFiles(loaded, at: position) }
+        // Die neuen Seiten auswählen, damit man sieht, wo sie gelandet sind.
+        let inserted = model.pageIDs.count - before
+        if inserted > 0, position + inserted <= model.pageIDs.count {
+            model.selectedPages = Set(model.pageIDs[position..<(position + inserted)])
+        }
+    }
+
+    func rotatePages(_ ids: [PageRef.ID], by rotation: Rotation) {
+        guard !ids.isEmpty else { return }
+        pdfDocument?.perform(loc("Drehen", "Rotate")) { try $0.change { try $0.rotate(ids, by: rotation) } }
+    }
+
+    func deletePages(_ ids: [PageRef.ID]) {
+        guard !ids.isEmpty else { return }
+        pdfDocument?.perform(loc("Seiten löschen", "Delete Pages")) { try $0.change { try $0.remove(ids) } }
+    }
+
+    func extractPages(_ ids: [PageRef.ID]) {
+        guard let window, let working = pdfDocument?.working, !ids.isEmpty else { return }
+        SaveFlow.extract(ids, of: working, window: window)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        let hasPages = !model.pageIDs.isEmpty
         switch menuItem.action {
+        case #selector(rotateLeft(_:)), #selector(rotateRight(_:)), #selector(delete(_:)),
+             #selector(extractSelectedPages(_:)):
+            return hasPages
+        case #selector(saveCopy(_:)), #selector(splitDocument(_:)):
+            return hasPages
         case #selector(toggleTwoPages(_:)):
             menuItem.state = pdfView.displayMode == .twoUpContinuous ? .on : .off
         case #selector(showThumbnails(_:)):

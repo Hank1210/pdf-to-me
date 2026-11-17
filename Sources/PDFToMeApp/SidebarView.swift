@@ -39,6 +39,9 @@ struct SidebarView: View {
 
 // MARK: - Miniaturen
 
+/// Farben der Quellmarker, reihum je Quelle.
+private let sourceColors: [Color] = [.blue, .orange, .green, .purple, .pink, .teal, .yellow, .red, .indigo, .brown]
+
 private struct ThumbnailList: View {
     @Bindable var model: DocumentViewModel
 
@@ -50,13 +53,41 @@ private struct ThumbnailList: View {
                         .tag(id)
                         .id(id)
                 }
+                // Umsortieren per Drag & Drop, auch mehrere ausgewählte Seiten.
+                .onMove { offsets, destination in
+                    let ids = offsets.map { model.pageIDs[$0] }
+                    model.commands?.movePages(ids, to: destination)
+                }
+                // PDFs und Bilder aus dem Finder zwischen zwei Miniaturen einfügen.
+                .onInsert(of: [.fileURL]) { position, providers in
+                    FileDrop.urls(from: providers) { urls in model.commands?.insertFiles(urls, at: position) }
+                }
             }
+            .contextMenu(forSelectionType: PageRef.ID.self) { ids in
+                if !ids.isEmpty { pageMenu(Array(ids)) }
+            }
+            .onDeleteCommand { model.commands?.deletePages(model.targetPageIDs) }
             .onChange(of: model.selectedPages) { model.thumbnailSelectionDidChange() }
             .onChange(of: model.currentPageIndex) { _, index in
                 guard model.pageIDs.indices.contains(index) else { return }
                 proxy.scrollTo(model.pageIDs[index])
             }
+            // Ablegen unterhalb der letzten Miniatur (auch bei leerem Dokument): ans Ende.
+            .dropDestination(for: URL.self) { urls, _ in
+                model.commands?.insertFiles(urls, at: model.pageIDs.count)
+                return !urls.isEmpty
+            }
         }
+    }
+
+    @ViewBuilder private func pageMenu(_ selection: [PageRef.ID]) -> some View {
+        let ids = model.pageIDs.filter(selection.contains)
+        Button(loc("Nach links drehen", "Rotate Left")) { model.commands?.rotatePages(ids, by: .threeQuarters) }
+        Button(loc("Nach rechts drehen", "Rotate Right")) { model.commands?.rotatePages(ids, by: .quarter) }
+        Divider()
+        Button(loc("Extrahieren …", "Extract…")) { model.commands?.extractPages(ids) }
+        Divider()
+        Button(loc("Löschen", "Delete"), role: .destructive) { model.commands?.deletePages(ids) }
     }
 }
 
@@ -67,29 +98,48 @@ private struct ThumbnailRow: View {
     @State private var image: NSImage?
 
     var body: some View {
-        VStack(spacing: 4) {
-            Group {
-                if let image {
-                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
-                } else {
-                    Rectangle().fill(.quaternary).aspectRatio(0.707, contentMode: .fit)
+        HStack(spacing: 6) {
+            marker
+            VStack(spacing: 4) {
+                Group {
+                    if let image {
+                        Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                    } else {
+                        Rectangle().fill(.quaternary).aspectRatio(0.707, contentMode: .fit)
+                    }
                 }
+                .frame(maxWidth: 120, maxHeight: 160)
+                .shadow(radius: 1)
+                Text("\(index + 1)")
+                    .font(.caption)
+                    .foregroundStyle(isCurrent ? .primary : .secondary)
+                    .fontWeight(isCurrent ? .semibold : .regular)
             }
-            .frame(maxWidth: 120, maxHeight: 160)
-            .shadow(radius: 1)
-            Text("\(index + 1)")
-                .font(.caption)
-                .foregroundStyle(isCurrent ? .primary : .secondary)
-                .fontWeight(isCurrent ? .semibold : .regular)
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
         .padding(.vertical, 4)
+        .help(sourceName)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(loc("Seite \(index + 1)", "Page \(index + 1)"))
+        .accessibilityLabel(model.showsSourceMarkers
+                            ? loc("Seite \(index + 1), aus \(sourceName)", "Page \(index + 1), from \(sourceName)")
+                            : loc("Seite \(index + 1)", "Page \(index + 1)"))
         // Erst zeichnen, wenn die Zeile sichtbar wird; neu bei jeder neuen Vorschau.
         .task(id: TaskKey(index: index, version: model.previewVersion)) {
             image = model.page(at: index)?.thumbnail(of: CGSize(width: 240, height: 320), for: .cropBox)
         }
+    }
+
+    /// Farbmarker der Quelle, nur wenn das Dokument Seiten aus mehreren Dateien hat.
+    @ViewBuilder private var marker: some View {
+        if model.showsSourceMarkers, model.pageSources.indices.contains(index) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(sourceColors[model.pageSources[index].colorIndex % sourceColors.count])
+                .frame(width: 4)
+        }
+    }
+
+    private var sourceName: String {
+        model.pageSources.indices.contains(index) ? model.pageSources[index].name : ""
     }
 
     private struct TaskKey: Equatable {

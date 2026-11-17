@@ -4,11 +4,14 @@ import PDFToMeCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.activate(ignoringOtherApps: true)
-        // Ohne geöffnetes Dokument gleich den Öffnen-Dialog zeigen, wie Vorschau. Später, damit Dokumente aus dem
-        // Finder oder aus der Fensterwiederherstellung zuerst ankommen.
+        // Erst ungesicherte Arbeit anbieten; ohne geöffnetes Dokument dann den Öffnen-Dialog zeigen, wie Vorschau.
+        // Später, damit Dokumente aus dem Finder oder aus der Fensterwiederherstellung zuerst ankommen.
         DispatchQueue.main.async {
-            if NSDocumentController.shared.documents.isEmpty {
-                NSDocumentController.shared.openDocument(nil)
+            MainActor.assumeIsolated {
+                let restored = SessionRecovery.offerAtLaunch()
+                if !restored, NSDocumentController.shared.documents.isEmpty {
+                    NSDocumentController.shared.openDocument(nil)
+                }
             }
         }
     }

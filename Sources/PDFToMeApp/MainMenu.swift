@@ -10,6 +10,12 @@ import PDFToMeCore
     func resetZoom(_ sender: Any?)
     func zoomToFit(_ sender: Any?)
     func toggleTwoPages(_ sender: Any?)
+    func saveCopy(_ sender: Any?)
+    func splitDocument(_ sender: Any?)
+    func extractSelectedPages(_ sender: Any?)
+    func insertFiles(_ sender: Any?)
+    func rotateLeft(_ sender: Any?)
+    func rotateRight(_ sender: Any?)
 }
 
 /// Das Hauptmenü, im Code aufgebaut (die App hat keine Nib-Dateien). Alle Texte zweisprachig über `loc`.
@@ -20,6 +26,7 @@ enum MainMenu {
         main.addItem(submenu(fileMenu()))
         main.addItem(submenu(editMenu()))
         main.addItem(submenu(viewMenu()))
+        main.addItem(submenu(pagesMenu()))
         main.addItem(submenu(goMenu()))
         let window = windowMenu()
         main.addItem(submenu(window))
@@ -61,6 +68,7 @@ enum MainMenu {
         menu.addItem(submenu(recent))
         menu.addItem(.separator())
         menu.addItem(item(loc("Schließen", "Close"), #selector(NSWindow.performClose(_:)), "w"))
+        menu.addItem(item(loc("Als Kopie sichern …", "Save as Copy…"), #selector(DocumentActions.saveCopy(_:)), "s"))
         menu.addItem(.separator())
         menu.addItem(item(loc("Papierformat …", "Page Setup…"), #selector(NSDocument.runPageLayout(_:)), "p",
                           [.command, .shift]))
@@ -70,6 +78,10 @@ enum MainMenu {
 
     private static func editMenu() -> NSMenu {
         let menu = NSMenu(title: loc("Bearbeiten", "Edit"))
+        // Titel wie „Widerrufen: Drehen“ setzt AppKit aus dem Aktionsnamen des Undo-Managers.
+        menu.addItem(item(loc("Widerrufen", "Undo"), Selector(("undo:")), "z"))
+        menu.addItem(item(loc("Wiederholen", "Redo"), Selector(("redo:")), "z", [.command, .shift]))
+        menu.addItem(.separator())
         menu.addItem(item(loc("Kopieren", "Copy"), #selector(NSText.copy(_:)), "c"))
         menu.addItem(item(loc("Alles auswählen", "Select All"), #selector(NSText.selectAll(_:)), "a"))
         menu.addItem(.separator())
@@ -95,6 +107,24 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item(loc("Vollbild", "Enter Full Screen"), #selector(NSWindow.toggleFullScreen(_:)), "f",
                           [.command, .control]))
+        return menu
+    }
+
+    private static func pagesMenu() -> NSMenu {
+        let menu = NSMenu(title: loc("Seiten", "Pages"))
+        menu.addItem(item(loc("Nach links drehen", "Rotate Left"), #selector(DocumentActions.rotateLeft(_:)), "l"))
+        menu.addItem(item(loc("Nach rechts drehen", "Rotate Right"), #selector(DocumentActions.rotateRight(_:)), "r"))
+        menu.addItem(.separator())
+        let delete = item(loc("Seiten löschen", "Delete Pages"), #selector(NSText.delete(_:)),
+                          String(Character(UnicodeScalar(NSBackspaceCharacter)!)))
+        menu.addItem(delete)
+        menu.addItem(.separator())
+        menu.addItem(item(loc("Dateien einfügen …", "Insert Files…"), #selector(DocumentActions.insertFiles(_:)),
+                          "i", [.command, .option]))
+        menu.addItem(item(loc("Seiten extrahieren …", "Extract Pages…"),
+                          #selector(DocumentActions.extractSelectedPages(_:)), "e", [.command, .option]))
+        menu.addItem(item(loc("Teilen …", "Split…"), #selector(DocumentActions.splitDocument(_:)), "t",
+                          [.command, .option]))
         return menu
     }
 

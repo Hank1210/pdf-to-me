@@ -3,6 +3,16 @@ import Observation
 import PDFKit
 import PDFToMeCore
 
+/// Seitenaktionen, die das Fenster ausführt (mit Undo, Fehlermeldungen und Dialogen).
+@MainActor
+protocol PageCommands: AnyObject {
+    func movePages(_ ids: [PageRef.ID], to position: Int)
+    func insertFiles(_ urls: [URL], at position: Int)
+    func rotatePages(_ ids: [PageRef.ID], by rotation: Rotation)
+    func deletePages(_ ids: [PageRef.ID])
+    func extractPages(_ ids: [PageRef.ID])
+}
+
 /// Zustand eines Dokumentfensters für die Ansichten. Die Logik liegt im Core (`WorkingDocument`, `DocumentSearch`);
 /// hier wird nur verbunden und angezeigt.
 @MainActor
@@ -14,12 +24,17 @@ final class DocumentViewModel {
 
     @ObservationIgnored let working: WorkingDocument
     @ObservationIgnored weak var pdfView: PDFView?
+    @ObservationIgnored weak var commands: PageCommands?
 
     var sidebarMode: SidebarMode = .thumbnails
     /// Erhöht sich bei jeder neuen Vorschau, damit Miniaturen neu gezeichnet werden.
     private(set) var previewVersion = 0
     private(set) var pageIDs: [PageRef.ID] = []
     private(set) var outline: [OutlineEntry] = []
+    /// Je Seite die Nummer ihrer Quelle für den Farbmarker und der Dateiname für den Tooltip.
+    private(set) var pageSources: [(colorIndex: Int, name: String)] = []
+    /// Farbmarker nur, wenn Seiten aus mehr als einer Quelle stammen.
+    private(set) var showsSourceMarkers = false
     private(set) var currentPageIndex = 0
     /// Ausgewählte Miniaturen. Folgt beim Blättern der aktuellen Seite, solange nicht mehrere ausgewählt sind.
     var selectedPages: Set<PageRef.ID> = []
@@ -50,6 +65,12 @@ final class DocumentViewModel {
 
     private func refreshFromPreview() {
         pageIDs = working.preview.pageIDs
+        let plan = working.plan
+        pageSources = plan.pages.map { page in
+            let index = plan.sources.firstIndex { $0.id == page.source } ?? 0
+            return (index, plan.source(of: page)?.displayName ?? "")
+        }
+        showsSourceMarkers = plan.sourcesInUse.count > 1
         outline = OutlineEntry.entries(of: document)
         selectedPages.formIntersection(pageIDs)
         previewVersion += 1
@@ -76,6 +97,21 @@ final class DocumentViewModel {
               index != currentPageIndex
         else { return }
         go(toPage: index)
+    }
+
+    // MARK: Seitenaktionen
+
+    /// Die Seiten, auf die sich eine Aktion bezieht: die Auswahl in Dokumentreihenfolge, sonst die aktuelle Seite.
+    var targetPageIDs: [PageRef.ID] {
+        let selected = pageIDs.filter { selectedPages.contains($0) }
+        if !selected.isEmpty { return selected }
+        return pageIDs.indices.contains(currentPageIndex) ? [pageIDs[currentPageIndex]] : []
+    }
+
+    /// Einfügestelle für neue Dateien: hinter der letzten ausgewählten Seite, sonst hinter der aktuellen.
+    var insertPosition: Int {
+        let positions = targetPageIDs.compactMap { pageIDs.firstIndex(of: $0) }
+        return (positions.max() ?? pageIDs.count - 1) + 1
     }
 
     // MARK: Suche
