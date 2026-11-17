@@ -1,0 +1,20 @@
+# Build-Ergebnisse
+.build/
+build
+build.noindex/
+*.zip
+*.sha256
+
+# Swift Package Manager / Xcode
+.swiftpm/
+*.xcodeproj/xcuserdata/
+DerivedData/
+
+# Editoren
+.vscode/
+
+# macOS
+.DS_Store
+
+# Arbeitsanweisungen für Claude Code (lokal)
+CLAUDE.md
