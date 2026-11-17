@@ -90,6 +90,17 @@ public enum PlanOperation: Codable, Hashable, Sendable {
         }
     }
 
+    /// Dieselbe Operation, in der eine darin gespeicherte Quelle geändert ist (Passwort, Bookmark).
+    func updatingSource(_ id: SourceFile.ID, _ change: (inout SourceFile) -> Void) -> PlanOperation {
+        guard case let .insert(pages, position, addedSources) = self else { return self }
+        let updated = addedSources.map { source -> SourceFile in
+            var source = source
+            if source.id == id { change(&source) }
+            return source
+        }
+        return .insert(pages: pages, position: position, addedSources: updated)
+    }
+
     // MARK: Hilfen
 
     /// Prüft die innere Form, bevor etwas angewendet wird: gleich viele Kennungen wie Positionen, Positionen

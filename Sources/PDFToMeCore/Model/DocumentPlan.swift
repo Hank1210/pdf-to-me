@@ -52,6 +52,42 @@ public struct DocumentPlan: Identifiable, Hashable, Sendable {
         pages.firstIndex { $0.id == id }
     }
 
+    /// Kennungen der Seiten aus einer Quelle, in der Reihenfolge des Plans.
+    public func pageIDs(from source: SourceFile.ID) -> [PageRef.ID] {
+        pages.filter { $0.source == source }.map(\.id)
+    }
+
+    /// Quellen, aus denen mindestens eine Seite im Plan steht, in der Reihenfolge von `sources`.
+    public var sourcesInUse: [SourceFile] {
+        let used = Set(pages.map(\.source))
+        return sources.filter { used.contains($0.id) }
+    }
+
+    // MARK: Angaben zu Quellen (ohne Undo)
+
+    // Diese Änderungen betreffen nicht den Inhalt des Dokuments und erzeugen deshalb keinen Undo-Schritt.
+
+    /// Setzt das Passwort einer Quelle im Speicher, z. B. nach erneuter Abfrage beim Wiederherstellen.
+    public mutating func setPassword(_ password: String?, for id: SourceFile.ID) throws {
+        try updateSource(id) { $0.password = password }
+    }
+
+    /// Ersetzt ein veraltetes Bookmark durch ein neues, das auf dieselbe Datei zeigt.
+    public mutating func replaceBookmark(_ bookmark: Data, for id: SourceFile.ID) throws {
+        try updateSource(id) { $0.bookmark = bookmark }
+    }
+
+    private mutating func updateSource(_ id: SourceFile.ID, _ change: (inout SourceFile) -> Void) throws {
+        guard let index = sources.firstIndex(where: { $0.id == id }) else {
+            throw DocumentPlanError.unknownSourceID(id)
+        }
+        change(&sources[index])
+        // Undo- und Redo-Stapel enthalten eigene Kopien hinzugefügter Quellen; dort ebenfalls ändern, damit ein
+        // Redo nicht das alte Bookmark oder Passwort zurückbringt.
+        undoStack = undoStack.map { $0.updatingSource(id, change) }
+        redoStack = redoStack.map { $0.updatingSource(id, change) }
+    }
+
     // MARK: Operationen
 
     /// Fügt Seiten an `position` ein (0…Anzahl der Seiten). `addingSources` sind neue Quellen, auf die die Seiten
@@ -242,6 +278,7 @@ public enum DocumentPlanError: Error, Equatable, LocalizedError {
     case unknownSource(page: PageRef.ID, source: SourceFile.ID)
     case pageIndexOutOfRange(page: PageRef.ID, index: Int, pageCount: Int)
     case unknownPage(PageRef.ID)
+    case unknownSourceID(SourceFile.ID)
     case positionOutOfRange(position: Int, count: Int)
     case emptySelection
     case historyMismatch
@@ -260,6 +297,8 @@ public enum DocumentPlanError: Error, Equatable, LocalizedError {
         case let .pageIndexOutOfRange(_, index, pageCount):
             loc("Eine Seite verweist auf Seite \(index + 1), die Quelldatei hat aber nur \(pageCount) Seiten.",
                 "A page refers to page \(index + 1), but the source file has only \(pageCount) pages.")
+        case .unknownSourceID:
+            loc("Die Quelldatei gehört nicht zu diesem Dokument.", "The source file does not belong to this document.")
         case .unknownPage:
             loc("Die Seite gehört nicht zu diesem Dokument.", "The page does not belong to this document.")
         case let .positionOutOfRange(position, count):

@@ -71,13 +71,22 @@ public enum SourceLoader {
 
     /// Der aktuelle Ort einer gemerkten Quelle, oder `nil`, wenn sie nicht mehr auffindbar ist.
     public static func resolve(_ source: SourceFile) -> URL? {
+        locate(source)?.url
+    }
+
+    /// Wie `resolve`, zusätzlich ein neues Bookmark, falls das gespeicherte veraltet ist (z. B. nach Umbenennen).
+    public static func locate(_ source: SourceFile) -> (url: URL, refreshedBookmark: Data?)? {
         var isStale = false
         guard let url = try? URL(
             resolvingBookmarkData: source.bookmark, options: [.withSecurityScope], relativeTo: nil,
             bookmarkDataIsStale: &isStale),
             FileManager.default.fileExists(atPath: url.path)
         else { return nil }
-        return url
+        guard isStale else { return (url, nil) }
+        let refreshed = withAccess(to: url) {
+            try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
+        return (url, refreshed)
     }
 
     /// SHA-256 als Hex-Text in Kleinbuchstaben.
