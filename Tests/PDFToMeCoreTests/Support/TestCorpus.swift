@@ -220,7 +220,11 @@ final class TestCorpus {
     }
 
     private func writePDF(to url: URL, password: String? = nil, draw: (CGContext) -> Void) throws {
-        var info: [CFString: Any] = [kCGPDFContextCreator: "PDF to me tests"]
+        // Titel = Dateiname ohne Endung, damit Tests die Übernahme der Metadaten prüfen können.
+        var info: [CFString: Any] = [
+            kCGPDFContextCreator: "PDF to me tests",
+            kCGPDFContextTitle: url.deletingPathExtension().lastPathComponent,
+        ]
         if let password {
             info[kCGPDFContextUserPassword] = password
             info[kCGPDFContextOwnerPassword] = password

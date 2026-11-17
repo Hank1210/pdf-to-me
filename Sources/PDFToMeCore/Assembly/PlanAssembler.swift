@@ -25,7 +25,7 @@ public struct AssembledDocument {
 /// - Kommt eine Quellseite mehrfach vor, zeigen Links und Inhaltsverzeichnis auf ihr erstes Vorkommen.
 public enum PlanAssembler {
     public static func assemble(
-        _ plan: DocumentPlan, contents: [SourceFile.ID: LoadedSource.Content]
+        _ plan: DocumentPlan, contents: SourceContents
     ) throws -> AssembledDocument {
         let document = PDFDocument()
         var imagePages: [SourceFile.ID: PDFPage] = [:]
@@ -106,7 +106,7 @@ public enum PlanAssembler {
     // MARK: Inhaltsverzeichnis
 
     private static func outline(
-        for plan: DocumentPlan, contents: [SourceFile.ID: LoadedSource.Content], document: PDFDocument,
+        for plan: DocumentPlan, contents: SourceContents, document: PDFDocument,
         firstCopy: [ObjectIdentifier: PDFPage]
     ) -> PDFOutline? {
         let usedSources = Set(plan.pages.map(\.source))
