@@ -94,6 +94,16 @@ public enum Splitter {
         }
     }
 
+    /// Name ohne Endung für ausgewählte Seiten (Positionen ab 0): zusammenhängend wie beim Teilen `Vertrag (3–5)`,
+    /// sonst `Vertrag (Auszug)`.
+    public static func extractBaseName(stem: String, positions: [Int]) -> String {
+        let sorted = Set(positions).sorted()
+        if let first = sorted.first, let last = sorted.last, last - first + 1 == sorted.count {
+            return "\(stem) (\(SplitPart(first: first + 1, last: last + 1).label))"
+        }
+        return "\(stem) (\(loc("Auszug", "extract")))"
+    }
+
     /// Name ohne Endung für die Teil-Dateien, z. B. `Vertrag (bearbeitet).pdf` → `Vertrag`.
     public static func stem(forOriginal fileName: String) -> String {
         FileNaming.stem(of: fileName)

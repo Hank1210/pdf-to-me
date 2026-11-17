@@ -56,6 +56,25 @@ public final class WorkingDocument {
         try commit(plan: candidate, contents: newContents)
     }
 
+    /// Fügt geladene Dateien mit allen Seiten an `position` ein, als ein einziger Undo-Schritt.
+    public func insertFiles(_ loaded: [LoadedSource], at position: Int) throws {
+        guard !loaded.isEmpty else { return }
+        let pages = loaded.flatMap { file in
+            (0..<file.source.pageCount).map { PageRef(source: file.source.id, index: $0) }
+        }
+        try add(loaded) { try $0.insert(pages, at: position, addingSources: loaded.map(\.source)) }
+    }
+
+    /// Der Ordner, in dem neue Dateien landen: der Ordner der ersten Quelle (README: „next to the original“).
+    public var defaultFolder: URL? {
+        plan.sources.first.flatMap(SourceLoader.resolve)?.deletingLastPathComponent()
+    }
+
+    /// Name ohne Endung für die erste Quelle, ohne Kennzeichnung als bearbeitet; Grundlage aller Zielnamen.
+    public var stem: String {
+        FileNaming.stem(of: displayName)
+    }
+
     public func undo() throws { try change { try $0.undo() } }
     public func redo() throws { try change { try $0.redo() } }
 

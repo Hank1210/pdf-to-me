@@ -149,3 +149,58 @@ final class WorkingDocumentTests: XCTestCase {
         XCTAssertEqual(reopened.preview.document.page(at: 0)?.string?.contains("A page 3"), true)
     }
 }
+
+final class WorkshopTests: XCTestCase {
+    private var corpus: TestCorpus!
+
+    override func setUpWithError() throws {
+        corpus = try TestCorpus()
+    }
+
+    override func tearDown() {
+        corpus.remove()
+        Localization.current = .de
+        super.tearDown()
+    }
+
+    /// Mehrere abgelegte Dateien sind ein einziger Undo-Schritt.
+    func testInsertFilesIsOneUndoStep() throws {
+        let document = try WorkingDocument(opening: corpus.pdf(named: "A", pages: 2), sessionStore: nil)
+        let files = [
+            try SourceLoader.load(corpus.pdf(named: "B", pages: 2)),
+            try SourceLoader.load(corpus.image(named: "Photo", format: .jpeg)),
+        ]
+        try document.insertFiles(files, at: 1)
+        let texts = (0..<5).map { document.preview.document.page(at: $0)?.string ?? "" }
+        XCTAssertTrue(texts[0].contains("A page 1"))
+        XCTAssertTrue(texts[1].contains("B page 1"))
+        XCTAssertTrue(texts[2].contains("B page 2"))
+        XCTAssertTrue(texts[3].isEmpty)                                 // das Bild
+        XCTAssertTrue(texts[4].contains("A page 2"))
+        XCTAssertEqual(document.plan.sources.count, 3)
+        XCTAssertEqual(document.plan.undoStack.count, 1)
+
+        try document.undo()
+        XCTAssertEqual(document.preview.document.pageCount, 2)
+        XCTAssertEqual(document.plan.sources.count, 1)
+        try document.insertFiles([], at: 0)
+        XCTAssertFalse(document.plan.canUndo)
+    }
+
+    func testDefaultFolderAndStem() throws {
+        let url = try corpus.pdf(named: "Vertrag (bearbeitet) 2", pages: 1)
+        let document = try WorkingDocument(opening: url, sessionStore: nil)
+        XCTAssertEqual(document.defaultFolder?.resolvingSymlinksInPath(),
+                       corpus.directory.resolvingSymlinksInPath())
+        XCTAssertEqual(document.stem, "Vertrag")
+    }
+
+    func testExtractBaseName() {
+        Localization.current = .de
+        XCTAssertEqual(Splitter.extractBaseName(stem: "Vertrag", positions: [4, 2, 3]), "Vertrag (3–5)")
+        XCTAssertEqual(Splitter.extractBaseName(stem: "Vertrag", positions: [6]), "Vertrag (7)")
+        XCTAssertEqual(Splitter.extractBaseName(stem: "Vertrag", positions: [0, 2]), "Vertrag (Auszug)")
+        Localization.current = .en
+        XCTAssertEqual(Splitter.extractBaseName(stem: "Contract", positions: [0, 5]), "Contract (extract)")
+    }
+}
