@@ -11,6 +11,19 @@ public enum VerificationFailure: Equatable, Sendable {
     case formFieldsMissing(page: Int, expected: [String], actual: [String])
     case outlineMissing(expected: Int, actual: Int)
 
+    /// Fester Name für das Protokoll, ohne Daten (Formularfeldnamen könnten Inhalt sein).
+    var logName: StaticString {
+        switch self {
+        case .cannotOpen: "cannotOpen"
+        case .wrongPassword: "wrongPassword"
+        case .pageCount: "pageCount"
+        case .textMismatch: "textMismatch"
+        case .linksMissing: "linksMissing"
+        case .formFieldsMissing: "formFieldsMissing"
+        case .outlineMissing: "outlineMissing"
+        }
+    }
+
     public var message: String {
         switch self {
         case .cannotOpen:

@@ -37,6 +37,20 @@ public enum SourceLoader {
     /// Die Datei wird einmal gelesen; Prüfsumme und Inhalt stammen aus denselben Bytes. Die Art (PDF oder Bild)
     /// wird am Inhalt erkannt, nicht an der Endung.
     public static func load(_ url: URL, password: String? = nil) throws -> LoadedSource {
+        do {
+            let loaded = try loadWithoutLogging(url, password: password)
+            Log.shared.info("source opened", [
+                "source": .id(loaded.source.id), "image": .bool(loaded.source.kind == .image),
+                "pages": .int(loaded.source.pageCount), "protected": .bool(loaded.source.password != nil),
+            ])
+            return loaded
+        } catch {
+            Log.shared.warning("source not opened", ["error": .error(error)])
+            throw error
+        }
+    }
+
+    private static func loadWithoutLogging(_ url: URL, password: String?) throws -> LoadedSource {
         let data = try read(url)
         let bookmark: Data
         do {

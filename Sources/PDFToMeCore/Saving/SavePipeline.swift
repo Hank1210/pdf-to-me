@@ -30,18 +30,23 @@ public struct SavePipeline {
         _ plan: DocumentPlan, contents: SourceContents, in directory: URL, baseName: String,
         options: WriteOptions = WriteOptions()
     ) throws -> SaveResult {
+        let started = Date()
         let expected = try PlanAssembler.assemble(plan, contents: contents)
         let temporary = try Self.temporaryURL(near: directory)
         do {
             try writer.compose(plan, contents: contents, to: temporary, options: options)
         } catch {
             try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent())
+            Log.shared.error("write failed", ["plan": .id(plan.id), "error": .error(error)])
             throw error
         }
 
         let failures = SaveVerifier.failures(
             of: temporary, expected: expected, plan: plan, password: options.password)
         guard failures.isEmpty else {
+            for failure in failures {
+                Log.shared.error("save check failed", ["plan": .id(plan.id), "failure": .name(failure.logName)])
+            }
             // Eine ungeschützte Kopie aus einer geschützten Quelle bleibt nicht liegen, auch nicht zur Diagnose.
             if options.password == nil, ProtectionSuggestion(for: plan) != nil {
                 try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent())
@@ -53,6 +58,10 @@ public struct SavePipeline {
 
         let destination = try Self.moveWithoutOverwriting(temporary, to: directory, baseName: baseName)
         try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent())
+        Log.shared.info("saved", [
+            "plan": .id(plan.id), "pages": .int(plan.pages.count), "warnings": .int(warnings.count),
+            "protected": .bool(options.password != nil), "seconds": .double(Date().timeIntervalSince(started)),
+        ])
         return SaveResult(url: destination, warnings: warnings)
     }
 

@@ -8,6 +8,8 @@ struct PDFToMeApp: App {
 
     init() {
         Localization.current = AppLanguage.systemDefault()
+        Log.shared.configure(file: try? AppIdentity.logFile())
+        Log.shared.info("app started")
     }
 
     var body: some Scene {

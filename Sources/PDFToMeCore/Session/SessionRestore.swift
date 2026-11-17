@@ -19,6 +19,15 @@ public enum SourceProblem: Equatable {
         }
     }
 
+    var logName: StaticString {
+        switch self {
+        case .missing: "missing"
+        case .changed: "changed"
+        case .needsPassword: "needsPassword"
+        case .unreadable: "unreadable"
+        }
+    }
+
     public var message: String {
         let name = source.displayName
         switch self {
@@ -65,6 +74,12 @@ public struct RestoredSession {
         problems = []
         for source in plan.sourcesInUse where contents[source.id] == nil {
             open(source, password: source.password)
+        }
+        Log.shared.info("session restored", [
+            "plan": .id(plan.id), "sources": .int(plan.sourcesInUse.count), "problems": .int(problems.count),
+        ])
+        for problem in problems {
+            Log.shared.warning("source problem", ["source": .id(problem.source.id), "problem": .name(problem.logName)])
         }
     }
 
