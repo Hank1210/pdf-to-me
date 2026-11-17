@@ -160,10 +160,29 @@ final class SavePipelineTests: XCTestCase {
                     return XCTFail("\(writer): \(error)")
                 }
                 XCTAssertTrue(failures.contains(where: expected), "\(writer): \(failures)")
+                guard let diagnosticFile else { return XCTFail("\(writer): no diagnostic file") }
                 XCTAssertTrue(FileManager.default.fileExists(atPath: diagnosticFile.path), "\(writer)")
                 try? FileManager.default.removeItem(at: diagnosticFile.deletingLastPathComponent())
             }
             XCTAssertEqual(try outputFiles(), [], "\(writer)")
+        }
+    }
+
+    /// Ohne Passwort gespeicherte Seiten aus einer geschützten Quelle bleiben nicht als Diagnosedatei liegen.
+    func testNoDiagnosticFileForUnprotectedCopyOfProtectedSource() throws {
+        try add(corpus.encryptedPDF(password: "test-password"), password: "test-password")
+        XCTAssertThrowsError(try save(with: BrokenWriter.dropLastPage)) { error in
+            guard case let .verificationFailed(_, diagnosticFile) = error as? SaveError else {
+                return XCTFail("\(error)")
+            }
+            XCTAssertNil(diagnosticFile)
+        }
+        // Mit Passwort geschützt darf sie zur Diagnose bleiben.
+        let protected = WriteOptions(password: "test-password")
+        XCTAssertThrowsError(try save(with: BrokenWriter.dropLastPage, options: protected)) {
+            guard case let .verificationFailed(_, diagnosticFile)? = $0 as? SaveError else { return XCTFail() }
+            XCTAssertNotNil(diagnosticFile)
+            diagnosticFile.map { try? FileManager.default.removeItem(at: $0.deletingLastPathComponent()) }
         }
     }
 

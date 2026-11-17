@@ -13,7 +13,8 @@ public struct SaveResult: Equatable, Sendable {
 /// ```text
 /// compose()  →  temporäre Datei auf demselben Volume wie das Ziel
 ///     ↓
-/// prüfen (SaveVerifier); bei Fehler bleibt die temporäre Datei für die Diagnose liegen
+/// prüfen (SaveVerifier); bei Fehler bleibt die temporäre Datei für die Diagnose liegen, außer sie enthält
+/// ungeschützt Seiten aus einer passwortgeschützten Quelle
 ///     ↓
 /// freien Namen wählen ("Name.pdf", "Name 2.pdf" …) und atomar ohne Überschreiben dorthin verschieben
 /// ```
@@ -41,6 +42,11 @@ public struct SavePipeline {
         let failures = SaveVerifier.failures(
             of: temporary, expected: expected, plan: plan, password: options.password)
         guard failures.isEmpty else {
+            // Eine ungeschützte Kopie aus einer geschützten Quelle bleibt nicht liegen, auch nicht zur Diagnose.
+            if options.password == nil, ProtectionSuggestion(for: plan) != nil {
+                try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent())
+                throw SaveError.verificationFailed(failures, diagnosticFile: nil)
+            }
             throw SaveError.verificationFailed(failures, diagnosticFile: temporary)
         }
         let warnings = SaveVerifier.warnings(of: temporary, plan: plan)
@@ -84,8 +90,9 @@ public struct SavePipeline {
 
 /// Warum nicht gespeichert wurde. Das Original ist in jedem Fall unverändert.
 public enum SaveError: Error, Equatable, LocalizedError {
-    /// Die Prüfung ist fehlgeschlagen. Die geschriebene Datei bleibt zur Diagnose an `diagnosticFile` liegen.
-    case verificationFailed([VerificationFailure], diagnosticFile: URL)
+    /// Die Prüfung ist fehlgeschlagen. Die geschriebene Datei bleibt zur Diagnose an `diagnosticFile` liegen;
+    /// `nil`, wenn sie gelöscht wurde, weil sie ungeschützt Inhalte einer geschützten Quelle enthielt.
+    case verificationFailed([VerificationFailure], diagnosticFile: URL?)
     case cannotWrite(folder: String, reason: String)
     case noFreeName(baseName: String)
 
