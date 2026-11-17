@@ -33,8 +33,11 @@
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>PDF Document</string>
+			<!-- Viewer: Die App schreibt nie in die geöffnete Datei; gespeichert wird immer als neue Datei. -->
 			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
+			<string>Viewer</string>
+			<key>NSDocumentClass</key>
+			<string>PDFToMeDocument</string>
 			<!-- Alternate: PDF to me erscheint unter „Öffnen mit“, wird aber nicht ungefragt Standard-App. -->
 			<key>LSHandlerRank</key>
 			<string>Alternate</string>
