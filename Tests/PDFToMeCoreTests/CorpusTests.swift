@@ -66,7 +66,8 @@ final class CorpusTests: XCTestCase {
         }
 
         let internalLink = try XCTUnwrap(document.page(at: 0)?.annotations.first { $0.type == "Link" })
-        let target = try XCTUnwrap(internalLink.destination?.page ?? (internalLink.action as? PDFActionGoTo)?.destination.page)
+        let target = try XCTUnwrap(
+            internalLink.destination?.page ?? (internalLink.action as? PDFActionGoTo)?.destination.page)
         XCTAssertEqual(document.index(for: target), 2)
 
         let external = try XCTUnwrap(document.page(at: 1)?.annotations.first { $0.type == "Link" })
