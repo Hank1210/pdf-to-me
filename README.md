@@ -70,8 +70,6 @@ Planned after version 1, roughly in this order:
    history
 4. Optional AI help: split suggestions, file names, questions about a document
 
-The [architecture document](ARCHITECTURE.md) describes the plan in detail (in German).
-
 ## What PDF to me does not do
 
 PDF to me covers everyday tasks. For these you still need a specialized tool such as Adobe Acrobat:
