@@ -132,6 +132,24 @@ final class WriterRoundTripTests: XCTestCase {
         }
     }
 
+    /// Die Felder müssen im Formularverzeichnis der neuen Datei stehen, sonst sind sie nicht mehr ausfüllbar.
+    func testFormFieldsStayFillable() throws {
+        try add(corpus.pdf(named: "Cover", pages: 1))
+        try add(corpus.formPDF())
+        for entry in writers {
+            let url = corpus.url("Fillable-\(entry.name).pdf")
+            try entry.writer.compose(plan, contents: contents, to: url, options: WriteOptions())
+            let check = { XCTAssertEqual(FormFields.names(at: url, password: nil), ["name", "agree"], entry.name) }
+            if entry.writer is PDFKitWriter {
+                // Bekannter Fehler: PlanAssembler kopiert in ein neues PDFDocument, dabei geht /AcroForm verloren.
+                // Behoben mit dem qpdf-Writer (M1b); bis dahin lehnt die Prüf-Pipeline solche Dateien ab.
+                XCTExpectFailure("PDFKitWriter verliert /AcroForm", options: .nonStrict()) { check() }
+            } else {
+                check()
+            }
+        }
+    }
+
     func testMixedScriptTextSurvives() throws {
         try add(corpus.mixedScriptPDF())
         for (name, document) in try writeAndReopen() {

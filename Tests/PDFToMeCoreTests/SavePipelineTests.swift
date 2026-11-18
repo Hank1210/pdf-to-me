@@ -130,13 +130,39 @@ final class SavePipelineTests: XCTestCase {
         XCTAssertTrue(document.unlock(withPassword: "test-password"))
     }
 
-    func testMergedFormsLinksAndImages() throws {
+    func testMergedLinksAndImages() throws {
         try add(corpus.linkedPDF())
-        try add(corpus.formPDF())
         try add(corpus.image(named: "Photo", format: .heic))
         try add(corpus.mixedScriptPDF())
         try plan.rotate([plan.pages[1].id], by: .quarter)
         XCTAssertEqual(try save().url.lastPathComponent, "Contract (edited).pdf")
+    }
+
+    /// Ein Writer, der das Formularverzeichnis verliert (heute der PDFKitWriter), wird von der Prüfung erkannt:
+    /// Es wird nichts gespeichert, und die Meldung nennt die Felder.
+    func testUnfillableFormsAreRejected() throws {
+        try add(corpus.pdf(named: "Cover", pages: 1))
+        try add(corpus.formPDF())
+        XCTAssertThrowsError(try save(with: PDFKitWriter())) {
+            guard case let .verificationFailed(failures, _)? = $0 as? SaveError else { return XCTFail("\($0)") }
+            XCTAssertEqual(failures, [.formFieldsNotFillable(missing: ["agree", "name"])])
+        }
+        XCTAssertEqual(try outputFiles(), [])
+    }
+
+    /// Widgets ohne Formularverzeichnis in der Quelle waren nie ausfüllbar und lassen die Prüfung nicht scheitern.
+    func testWidgetsWithoutAcroFormInSourceDoNotFailTheCheck() throws {
+        let blank = try XCTUnwrap(PDFDocument(url: corpus.pdf(named: "Widgets", pages: 1)))
+        let widget = PDFAnnotation(bounds: CGRect(x: 72, y: 600, width: 200, height: 24), forType: .widget,
+                                   withProperties: nil)
+        widget.widgetFieldType = .text
+        widget.fieldName = "loose"
+        blank.page(at: 0)?.addAnnotation(widget)
+        let url = corpus.url("Widgets only.pdf")
+        XCTAssertTrue(blank.write(to: url))
+        XCTAssertEqual(FormFields.names(at: url, password: nil), [])
+        try add(url)
+        XCTAssertNoThrow(try save())
     }
 
     // MARK: Prüfung schlägt fehl

@@ -10,6 +10,8 @@ public enum VerificationFailure: Equatable, Sendable {
     case linksMissing(page: Int, expected: Int, actual: Int)
     case formFieldsMissing(page: Int, expected: [String], actual: [String])
     case outlineMissing(expected: Int, actual: Int)
+    /// Felder sind zwar sichtbar, stehen aber nicht im Formularverzeichnis und lassen sich nicht mehr ausfüllen.
+    case formFieldsNotFillable(missing: [String])
 
     /// Fester Name für das Protokoll, ohne Daten (Formularfeldnamen könnten Inhalt sein).
     var logName: StaticString {
@@ -21,6 +23,7 @@ public enum VerificationFailure: Equatable, Sendable {
         case .linksMissing: "linksMissing"
         case .formFieldsMissing: "formFieldsMissing"
         case .outlineMissing: "outlineMissing"
+        case .formFieldsNotFillable: "formFieldsNotFillable"
         }
     }
 
@@ -42,6 +45,10 @@ public enum VerificationFailure: Equatable, Sendable {
                 "Links are missing on page \(page) (\(actual) instead of \(expected)).")
         case let .formFieldsMissing(page, _, _):
             loc("Auf Seite \(page) fehlen Formularfelder.", "Form fields are missing on page \(page).")
+        case let .formFieldsNotFillable(missing):
+            loc("Formularfelder lassen sich in der neuen Datei nicht mehr ausfüllen: "
+                + "\(missing.joined(separator: ", ")).",
+                "Form fields can no longer be filled in the new file: \(missing.joined(separator: ", ")).")
         case let .outlineMissing(expected, actual):
             loc("Im Inhaltsverzeichnis fehlen Einträge (\(actual) statt \(expected)).",
                 "Entries are missing from the table of contents (\(actual) instead of \(expected)).")
@@ -77,7 +84,7 @@ public enum SaveVerifier {
 
     /// Prüft und gibt alle gefundenen Fehler zurück; leer heißt bestanden.
     public static func failures(
-        of url: URL, expected: AssembledDocument, plan: DocumentPlan, password: String?
+        of url: URL, expected: AssembledDocument, plan: DocumentPlan, contents: SourceContents, password: String?
     ) -> [VerificationFailure] {
         guard let written = PDFDocument(url: url) else { return [.cannotOpen] }
         if written.isLocked {
@@ -110,7 +117,32 @@ public enum SaveVerifier {
         if actualOutline < expectedOutline {
             failures.append(.outlineMissing(expected: expectedOutline, actual: actualOutline))
         }
+        let missingFields = fillableFields(expectedIn: plan, contents: contents, reference: reference)
+            .subtracting(FormFields.names(at: url, password: password))
+        if !missingFields.isEmpty {
+            failures.append(.formFieldsNotFillable(missing: missingFields.sorted()))
+        }
         return failures
+    }
+
+    /// Felder, die in einer Quelle im Formularverzeichnis stehen und deren Widget auf einer übernommenen Seite liegt.
+    /// Widgets aus Quellen ohne Formularverzeichnis waren schon dort nicht ausfüllbar und zählen nicht.
+    static func fillableFields(
+        expectedIn plan: DocumentPlan, contents: SourceContents, reference: PDFDocument
+    ) -> Set<String> {
+        var registered: [SourceFile.ID: Set<String>] = [:]
+        for source in plan.sourcesInUse {
+            guard case let .pdf(document) = contents[source.id], let cgDocument = document.documentRef else { continue }
+            registered[source.id] = FormFields.names(in: cgDocument)
+        }
+        var expected = Set<String>()
+        for (index, ref) in plan.pages.enumerated() {
+            guard let fields = registered[ref.source], !fields.isEmpty, let page = reference.page(at: index) else {
+                continue
+            }
+            expected.formUnion(fieldNames(on: page).filter(fields.contains))
+        }
+        return expected
     }
 
     /// Hinweise, die das Speichern nicht verhindern.

@@ -1,6 +1,7 @@
 import ImageIO
 import PDFKit
 import XCTest
+@testable import PDFToMeCore
 
 /// Sichert ab, dass jede erzeugte Testdatei die Eigenschaft hat, die andere Tests von ihr erwarten.
 final class CorpusTests: XCTestCase {
@@ -82,6 +83,13 @@ final class CorpusTests: XCTestCase {
         XCTAssertEqual(Set(byName.keys), ["name", "agree"])
         XCTAssertEqual(byName["name"]?.widgetStringValue, "Jane Doe")
         XCTAssertEqual(byName["agree"]?.buttonWidgetState, .onState)
+        XCTAssertTrue(document.page(at: 0)?.string?.contains("Form page 1") == true)
+    }
+
+    /// Die Felder stehen im Formularverzeichnis, sind also wirklich ausfüllbar (nicht nur sichtbare Widgets).
+    func testFormPDFHasAcroForm() throws {
+        XCTAssertEqual(FormFields.names(at: try corpus.formPDF(), password: nil), ["name", "agree"])
+        XCTAssertEqual(FormFields.names(at: try corpus.pdf(named: "Plain", pages: 1), password: nil), [])
     }
 
     func testScannedPDFHasNoText() throws {

@@ -42,7 +42,7 @@ public struct SavePipeline {
         }
 
         let failures = SaveVerifier.failures(
-            of: temporary, expected: expected, plan: plan, password: options.password)
+            of: temporary, expected: expected, plan: plan, contents: contents, password: options.password)
         guard failures.isEmpty else {
             for failure in failures {
                 Log.shared.error("save check failed", ["plan": .id(plan.id), "failure": .name(failure.logName)])

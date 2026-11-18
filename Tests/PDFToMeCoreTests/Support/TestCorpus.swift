@@ -94,32 +94,48 @@ final class TestCorpus {
     static let linkRect = CGRect(x: 72, y: 395, width: 200, height: 20)
     static let externalLink = URL(string: "https://example.com/")!
 
-    /// Eine Seite mit einem Textfeld (`name`, Wert `Jane Doe`) und einem angekreuzten Kontrollkästchen (`agree`).
+    /// Ein echtes AcroForm-Formular: eine Seite mit dem Text `"<name> page 1"`, einem Textfeld `name` (Wert
+    /// `Jane Doe`) und einem angekreuzten Kontrollkästchen `agree`, beide im Formularverzeichnis `/AcroForm /Fields`.
+    ///
+    /// Von Hand als PDF-Text geschrieben: Mit PDFKit erzeugte Formulare haben kein `/AcroForm` und taugen deshalb
+    /// nicht als Prüfstein (so wurde der Formularfehler des `PDFKitWriter` lange übersehen).
     @discardableResult
     func formPDF(named name: String = "Form") throws -> URL {
-        let blank = try pdf(named: "\(name)-blank", pages: 1)
-        let document = try unwrap(PDFDocument(url: blank))
-        let page = try unwrap(document.page(at: 0))
+        let marker = Self.marker(name, page: 1)
+        let content = "BT /F1 18 Tf 72 742 Td (\(marker)) Tj ET"
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [4 0 R 5 0 R] /NeedAppearances true "
+                + "/DA (/Helv 12 Tf 0 g) /DR << /Font << /Helv 7 0 R >> >> >> >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Annots [4 0 R 5 0 R] /Contents 6 0 R "
+                + "/Resources << /Font << /F1 7 0 R >> >> >>",
+            "<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /V (Jane Doe) /DA (/Helv 12 Tf 0 g) "
+                + "/Rect [72 600 272 624] /P 3 0 R /F 4 >>",
+            "<< /Type /Annot /Subtype /Widget /FT /Btn /T (agree) /V /Yes /AS /Yes /Rect [72 560 90 578] "
+                + "/P 3 0 R /F 4 /AP << /N << /Yes 8 0 R /Off 9 0 R >> >> >>",
+            "<< /Length \(content.utf8.count) >>\nstream\n\(content)\nendstream",
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 18 18] /Length 18 >>\nstream\n0 g 3 3 12 12 re f\nendstream",
+            "<< /Type /XObject /Subtype /Form /BBox [0 0 18 18] /Length 0 >>\nstream\n\nendstream",
+        ]
+        try Data(Self.pdfFile(objects: objects).utf8).write(to: url("\(name).pdf"))
+        return url("\(name).pdf")
+    }
 
-        let textField = PDFAnnotation(
-            bounds: CGRect(x: 72, y: 600, width: 200, height: 24), forType: .widget, withProperties: nil)
-        textField.widgetFieldType = .text
-        textField.fieldName = "name"
-        textField.widgetStringValue = "Jane Doe"
-        page.addAnnotation(textField)
-
-        let checkbox = PDFAnnotation(
-            bounds: CGRect(x: 72, y: 560, width: 18, height: 18), forType: .widget, withProperties: nil)
-        checkbox.widgetFieldType = .button
-        checkbox.widgetControlType = .checkBoxControl
-        checkbox.fieldName = "agree"
-        checkbox.buttonWidgetState = .onState
-        page.addAnnotation(checkbox)
-
-        let url = url("\(name).pdf")
-        guard document.write(to: url) else { throw CorpusError.writeFailed(url) }
-        try FileManager.default.removeItem(at: blank)
-        return url
+    /// Setzt eine PDF-Datei aus Objekten zusammen (Objekt `i + 1` ist `objects[i]`, Objekt 1 der Katalog), mit
+    /// korrekter Querverweistabelle.
+    static func pdfFile(objects: [String]) -> String {
+        var pdf = "%PDF-1.7\n"
+        var offsets: [Int] = []
+        for (index, body) in objects.enumerated() {
+            offsets.append(pdf.utf8.count)
+            pdf += "\(index + 1) 0 obj\n\(body)\nendobj\n"
+        }
+        let xref = pdf.utf8.count
+        pdf += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n"
+        for offset in offsets { pdf += String(format: "%010d 00000 n \n", offset) }
+        pdf += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
+        return pdf
     }
 
     /// Eine Seite, die nur aus einem Bild besteht, wie ein Scan ohne Textebene.
@@ -271,10 +287,5 @@ final class TestCorpus {
         context.fill(CGRect(x: 0, y: size.height * 0.75, width: size.width * 0.25, height: size.height * 0.25))
         guard let image = context.makeImage() else { throw CorpusError.missing("image") }
         return image
-    }
-
-    private func unwrap<T>(_ value: T?) throws -> T {
-        guard let value else { throw CorpusError.missing(String(describing: T.self)) }
-        return value
     }
 }
