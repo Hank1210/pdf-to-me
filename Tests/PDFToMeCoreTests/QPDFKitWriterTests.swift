@@ -97,6 +97,55 @@ final class QPDFKitWriterTests: XCTestCase {
         XCTAssertNil(document.outlineRoot)
     }
 
+    // MARK: Vererbte Seiteneigenschaften
+
+    /// Schriften (`/Resources`), Seitengröße (`/MediaBox`) und Drehung (`/Rotate`) stehen nur am Seitenbaum und werden
+    /// an die Seiten vererbt, wie es viele Programme für Angebote und Rechnungen schreiben.
+    private func inheritedAttributesPDF() throws -> URL {
+        func content(_ number: Int) -> String {
+            let text = "BT /F1 18 Tf 72 500 Td (Inherited page \(number)) Tj ET"
+            return "<< /Length \(text.utf8.count) >>\nstream\n\(text)\nendstream"
+        }
+        let objects = [
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 /MediaBox [0 0 842 595] /Rotate 90 "
+                + "/Resources << /Font << /F1 7 0 R >> >> >>",
+            "<< /Type /Page /Parent 2 0 R /Contents 5 0 R >>",
+            "<< /Type /Page /Parent 2 0 R /Contents 6 0 R >>",
+            content(1), content(2),
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        ]
+        let url = corpus.url("Inherited.pdf")
+        try Data(TestCorpus.pdfFile(objects: objects).utf8).write(to: url)
+        return url
+    }
+
+    func testInheritedAttributesSurviveSplitAndReorder() throws {
+        let url = try inheritedAttributesPDF()
+        let source = try XCTUnwrap(PDFDocument(url: url))
+        XCTAssertTrue(source.page(at: 0)?.string?.contains("Inherited page 1") == true, "Vorbedingung")
+
+        try add(url)
+        plan = try plan.extracting([plan.pages[1].id, plan.pages[0].id].reversed())
+        let (document, _) = try write()
+        for (index, number) in [(0, 1), (1, 2)] {
+            let page = try XCTUnwrap(document.page(at: index))
+            XCTAssertTrue(page.string?.contains("Inherited page \(number)") == true, page.string ?? "kein Text")
+            XCTAssertEqual(page.bounds(for: .mediaBox).size, CGSize(width: 842, height: 595))
+            XCTAssertEqual(page.rotation, 90)
+        }
+    }
+
+    /// Dasselbe über die ganze Speicher-Pipeline: Die Prüfung darf nicht fehlschlagen.
+    func testInheritedAttributesPassTheCheck() throws {
+        try add(inheritedAttributesPDF())
+        let folder = corpus.url("Saved")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let results = Splitter.save(plan, contents: contents, parts: [SplitPart(first: 1, last: 1)], in: folder,
+                                    stem: "Inherited", pipeline: SavePipeline(writer: QPDFKitWriter()))
+        XCTAssertNoThrow(try results[0].result.get())
+    }
+
     // MARK: Doppelte Seiten und Formulare
 
     func testDuplicatePageGetsOwnLinks() throws {

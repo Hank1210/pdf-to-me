@@ -101,6 +101,10 @@ QKStatus qk_add_source(QKComposer *composer, const void *bytes, size_t length, c
         // Beschreibung ohne Dateinamen, damit Fehlermeldungen keine persönlichen Angaben enthalten.
         std::string description = "source " + std::to_string(composer->sources.size() + 1);
         source->pdf->processMemoryFile(description.c_str(), source->bytes.data(), source->bytes.size(), password);
+        // Vom Seitenbaum geerbte Eigenschaften (/Resources, /MediaBox, /CropBox, /Rotate) auf jede Seite schieben.
+        // Beim Kopieren wird nur die Seite selbst übernommen; ohne diesen Schritt fehlen sonst Schriften, Seitengröße
+        // und Drehung. Betrifft nur diese Kopie im Speicher, nie die Datei.
+        source->pdf->pushInheritedAttributesToPage();
         source->pages = QPDFPageDocumentHelper(*source->pdf).getAllPages();
         source->forms = std::make_unique<QPDFAcroFormDocumentHelper>(*source->pdf);
         source->outlines = std::make_unique<QPDFOutlineDocumentHelper>(*source->pdf);
