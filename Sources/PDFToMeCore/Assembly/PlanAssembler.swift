@@ -39,7 +39,7 @@ public enum PlanAssembler {
             }
             let page: PDFPage
             switch content {
-            case let .pdf(sourceDocument):
+            case let .pdf(sourceDocument, _):
                 guard let original = sourceDocument.page(at: ref.index) else {
                     throw AssemblyError.pageMissing(fileName: source.displayName, page: ref.index + 1)
                 }
@@ -112,7 +112,7 @@ public enum PlanAssembler {
         let usedSources = Set(plan.pages.map(\.source))
         var groups: [(source: SourceFile, items: [PDFOutline])] = []
         for source in plan.sources where usedSources.contains(source.id) {
-            guard case let .pdf(sourceDocument) = contents[source.id], let root = sourceDocument.outlineRoot
+            guard case let .pdf(sourceDocument, _) = contents[source.id], let root = sourceDocument.outlineRoot
             else { continue }
             let items = (0..<root.numberOfChildren).compactMap { root.child(at: $0) }
                 .compactMap { copyOutline($0, firstCopy: firstCopy) }

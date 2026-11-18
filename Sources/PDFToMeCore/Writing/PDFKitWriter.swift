@@ -37,7 +37,7 @@ public struct PDFKitWriter: PDFWriting {
     static func attributes(for plan: DocumentPlan, contents: SourceContents) -> [AnyHashable: Any] {
         var attributes: [AnyHashable: Any] = [:]
         let firstPDF = plan.pages.lazy.compactMap { page -> PDFDocument? in
-            if case let .pdf(document) = contents[page.source] { return document }
+            if case let .pdf(document, _) = contents[page.source] { return document }
             return nil
         }.first
         let keys: [PDFDocumentAttribute] = [.titleAttribute, .authorAttribute, .subjectAttribute, .keywordsAttribute]

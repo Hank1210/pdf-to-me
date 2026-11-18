@@ -5,9 +5,12 @@ import XCTest
 
 /// Rundlauf-Tests: Plan bauen, schreiben, die Datei frisch öffnen und vergleichen.
 ///
-/// Laufen gegen jeden Writer in `writers`. In M1b kommt `PDFiumWriter` dazu; beide müssen dieselben Tests bestehen.
+/// Laufen gegen jeden Writer in `writers`; alle müssen dieselben Tests bestehen (Ausnahme: der bekannte
+/// Formularfehler des `PDFKitWriter`).
 final class WriterRoundTripTests: XCTestCase {
-    private let writers: [(name: String, writer: any PDFWriting)] = [("PDFKit", PDFKitWriter())]
+    private let writers: [(name: String, writer: any PDFWriting)] = [
+        ("PDFKit", PDFKitWriter()), ("qpdf", QPDFKitWriter()),
+    ]
 
     private var corpus: TestCorpus!
     private var plan: DocumentPlan!

@@ -38,6 +38,10 @@ public enum WriterError: Error, Equatable, LocalizedError {
     case destinationExists(fileName: String)
     case noPages
     case writeFailed(fileName: String)
+    /// Eine Quelle ließ sich beim Schreiben nicht lesen (sie war beim Öffnen lesbar; eher ein Fehler im Writer).
+    case sourceUnreadable(fileName: String, reason: String)
+    /// Der Writer meldet einen Fehler; `reason` ist seine (englische) Beschreibung.
+    case engineFailed(fileName: String, reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -48,6 +52,11 @@ public enum WriterError: Error, Equatable, LocalizedError {
             loc("Das Dokument hat keine Seiten.", "The document has no pages.")
         case let .writeFailed(name):
             loc("„\(name)“ ließ sich nicht schreiben.", "“\(name)” could not be written.")
+        case let .sourceUnreadable(name, reason):
+            loc("„\(name)“ ließ sich beim Speichern nicht lesen (\(reason)).",
+                "“\(name)” could not be read while saving (\(reason)).")
+        case let .engineFailed(name, reason):
+            loc("„\(name)“ ließ sich nicht schreiben (\(reason)).", "“\(name)” could not be written (\(reason)).")
         }
     }
 }

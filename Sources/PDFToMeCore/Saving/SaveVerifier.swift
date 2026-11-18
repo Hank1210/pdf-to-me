@@ -132,7 +132,9 @@ public enum SaveVerifier {
     ) -> Set<String> {
         var registered: [SourceFile.ID: Set<String>] = [:]
         for source in plan.sourcesInUse {
-            guard case let .pdf(document) = contents[source.id], let cgDocument = document.documentRef else { continue }
+            guard case let .pdf(document, _) = contents[source.id], let cgDocument = document.documentRef else {
+                continue
+            }
             registered[source.id] = FormFields.names(in: cgDocument)
         }
         var expected = Set<String>()

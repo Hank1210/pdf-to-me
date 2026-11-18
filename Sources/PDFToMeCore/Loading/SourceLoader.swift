@@ -8,8 +8,9 @@ import UniformTypeIdentifiers
 /// Eine geöffnete Quelle: die Beschreibung für den Plan und der geladene Inhalt für Vorschau und Speichern.
 public struct LoadedSource {
     public enum Content {
-        /// Entsperrt, falls die PDF verschlüsselt ist.
-        case pdf(PDFDocument)
+        /// Entsperrt, falls die PDF verschlüsselt ist. `data` sind genau die beim Öffnen gelesenen Bytes (dieselben,
+        /// aus denen `sha256` berechnet wurde); daraus schreibt qpdf.
+        case pdf(PDFDocument, data: Data)
         /// Das Bild und seine EXIF-Ausrichtung; die Ausrichtung wird erst beim Anzeigen und Speichern angewendet.
         case image(CGImage, orientation: CGImagePropertyOrientation)
     }
@@ -141,7 +142,7 @@ public enum SourceLoader {
             let source = SourceFile(
                 id: id, kind: .pdf, displayName: fileName, bookmark: bookmark, sha256: hash,
                 pageCount: document.pageCount, password: usedPassword)
-            return LoadedSource(source: source, content: .pdf(document))
+            return LoadedSource(source: source, content: .pdf(document, data: data))
         }
 
         if let imageSource = CGImageSourceCreateWithData(data as CFData, nil),

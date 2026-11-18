@@ -41,7 +41,7 @@ final class SourceLoaderTests: XCTestCase {
         XCTAssertEqual(loaded.source.sha256, expectedHash)
         XCTAssertEqual(loaded.source.sha256.count, 64)
 
-        guard case let .pdf(document) = loaded.content else { return XCTFail("expected PDF content") }
+        guard case let .pdf(document, _) = loaded.content else { return XCTFail("expected PDF content") }
         XCTAssertEqual(document.pageCount, 3)
         XCTAssertTrue(document.page(at: 2)?.string?.contains("Contract page 3") == true)
         XCTAssertNoThrow(try DocumentPlan(source: loaded.source))
@@ -64,7 +64,7 @@ final class SourceLoaderTests: XCTestCase {
         let loaded = try SourceLoader.load(url, password: "test-password")
         XCTAssertEqual(loaded.source.password, "test-password")
         XCTAssertEqual(loaded.source.pageCount, 2)
-        guard case let .pdf(document) = loaded.content else { return XCTFail("expected PDF content") }
+        guard case let .pdf(document, _) = loaded.content else { return XCTFail("expected PDF content") }
         XCTAssertFalse(document.isLocked)
         XCTAssertTrue(document.page(at: 0)?.string?.contains("Encrypted page 1") == true)
     }
