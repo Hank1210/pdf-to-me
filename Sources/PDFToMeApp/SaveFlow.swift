@@ -53,8 +53,10 @@ enum SaveFlow {
             switch part.result {
             case let .success(result): saved.append(result)
             case let .failure(error):
-                failures.append(loc("Seiten \(part.part.label): ", "Pages \(part.part.label): ")
-                                + (error.localizedDescription))
+                let single = part.part.first == part.part.last
+                let label = single ? loc("Seite \(part.part.label): ", "Page \(part.part.label): ")
+                                   : loc("Seiten \(part.part.label): ", "Pages \(part.part.label): ")
+                failures.append(label + reason(error))
             }
         }
         report(saved, failures: failures, window: window)
@@ -170,6 +172,14 @@ enum SaveFlow {
                 NSWorkspace.shared.activateFileViewerSelecting(saved.map(\.url))
             }
         }
+    }
+
+    /// Nur die Ursache, ohne den Satz zum Original; den hängt die Sammelmeldung einmal an.
+    private static func reason(_ error: Error) -> String {
+        if case let .verificationFailed(failures, _)? = error as? SaveError {
+            return failures.map(\.message).joined(separator: " ")
+        }
+        return error.localizedDescription
     }
 
     static func showError(_ error: Error, window: NSWindow) {
