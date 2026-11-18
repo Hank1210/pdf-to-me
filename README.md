@@ -53,8 +53,8 @@ Highlights, notes, drawings, form filling and signatures are planned for later v
 - **Every file is checked before it is saved.** The app reopens the new file and verifies the page count, the text
   and the links. If the check fails, the file is not saved and you see why.
 
-- **Unsaved work survives a crash.** After a restart the app restores your changes. If a source file was moved or
-  changed in the meantime, it tells you.
+- **Unsaved work survives a crash.** After a restart the app restores your changes. If a source file can no
+  longer be found or was changed in the meantime, it tells you.
 
 ### Languages
 
