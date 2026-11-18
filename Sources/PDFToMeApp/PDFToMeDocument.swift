@@ -49,6 +49,7 @@ final class PDFToMeDocument: NSDocument {
     override func makeWindowControllers() {
         guard let working else { return }
         addWindowController(DocumentWindowController(document: self, working: working))
+        StartWindow.shared.close()
     }
 
     // MARK: Änderungen und Undo

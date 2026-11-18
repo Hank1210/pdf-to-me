@@ -16,6 +16,9 @@ PDF to me is the sister app of [Scan to me](https://github.com/Hank1210/scan-to-
 
 ### Read
 
+- **Start window.** When no document is open, the app shows a start window. Drop a PDF on it, open a file or
+  pick one of the five most recently used.
+
 - **Continuous scrolling** with zoom and an optional two-page view.
 
 - **Search** across the whole document. Matches are listed by page.
