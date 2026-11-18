@@ -4,11 +4,32 @@ PDF to me is available under the [MIT License](LICENSE). This file lists the sep
 
 ## Bundled components
 
-None yet.
+These components are built from source by `Scripts/fetch-qpdf.sh` (pinned versions, verified SHA-256 checksums)
+and linked statically into the app. Their full license texts are in [`THIRD_PARTY_LICENSES/`](THIRD_PARTY_LICENSES).
 
-PDFium will be added in milestone M1b. Its entry will list the version, source, copyright and license (BSD-3-Clause,
-with parts under Apache License 2.0), and the full license texts will be stored in `THIRD_PARTY_LICENSES/`. Every
-component that is compiled into the app or shipped in the community build must be listed here before it is merged.
+### qpdf 12.4.2
+
+- Source: <https://github.com/qpdf/qpdf>, release `v12.4.2`
+- Copyright (c) 2005-2021 Jay Berkenbilt, 2022-2026 Jay Berkenbilt and Manfred Holger
+- License: Apache License 2.0 ([`qpdf-LICENSE.txt`](THIRD_PARTY_LICENSES/qpdf-LICENSE.txt)); notices for the
+  included Rijndael (public domain) and sha2 (sphlib, MIT-style) code in
+  [`qpdf-NOTICE.md`](THIRD_PARTY_LICENSES/qpdf-NOTICE.md)
+- Used for: writing new PDF files from pages of existing ones (merge, split, reorder, rotate) while keeping links,
+  the table of contents and form fields, and for password protection
+- Built with qpdf's native crypto provider; not modified
+
+### libjpeg-turbo 3.2.1
+
+- Source: <https://github.com/libjpeg-turbo/libjpeg-turbo>, release `3.2.1`
+- License: IJG License and Modified (3-clause) BSD License
+  ([`libjpeg-turbo-LICENSE.md`](THIRD_PARTY_LICENSES/libjpeg-turbo-LICENSE.md),
+  [`libjpeg-turbo-README.ijg`](THIRD_PARTY_LICENSES/libjpeg-turbo-README.ijg))
+- Required by qpdf for JPEG image data; only the libjpeg API library is built (no SIMD, no TurboJPEG API, no tools)
+- This software is based in part on the work of the Independent JPEG Group.
+
+### zlib
+
+PDF to me uses the zlib library supplied with macOS through qpdf. It is not bundled with the app.
 
 ## Apple frameworks
 

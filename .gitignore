@@ -21,3 +21,6 @@ ARCHITECTURE.md
 
 # Arbeitsanweisungen für Claude Code (lokal)
 CLAUDE.md
+
+# qpdf und libjpeg-turbo, gebaut von Scripts/fetch-qpdf.sh (keine Binärdateien im Repo)
+Vendor/

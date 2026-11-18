@@ -137,10 +137,13 @@ There is no automatic updater. New versions are published on GitHub Releases.
 ## Building from source
 
 The project is a Swift package without an Xcode project. It uses Swift, SwiftUI and AppKit. The only third-party
-component is PDFium, which Swift Package Manager downloads as a prebuilt binary on the first build, so the first
-build needs an internet connection.
+components are qpdf and libjpeg-turbo (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+`Scripts/fetch-qpdf.sh` downloads their source code once, checks it against pinned SHA-256 checksums and builds
+static libraries into `Vendor/`, which is not part of the repository. This first build needs an internet connection
+and [CMake](https://cmake.org) (`brew install cmake`).
 
 ```sh
+./Scripts/fetch-qpdf.sh    # once: builds qpdf and libjpeg-turbo into Vendor/
 swift test                 # unit tests
 ./build-app.sh             # builds "build/PDF to me.app" with an ad hoc signature
 ```
@@ -148,7 +151,8 @@ swift test                 # unit tests
 | Path | Contents |
 | --- | --- |
 | `Sources/PDFToMeCore/` | All logic, covered by tests: document model, page operations, saving and checks |
-| `Sources/PDFiumKit/` | Swift wrapper around PDFium |
+| `Sources/QPDFKit/` | C interface to qpdf |
+| `Scripts/fetch-qpdf.sh` | Downloads, verifies and builds qpdf and libjpeg-turbo |
 | `Sources/PDFToMeApp/` | User interface, kept thin |
 | `Tests/PDFToMeCoreTests/` | Tests, including a corpus of test PDFs |
 

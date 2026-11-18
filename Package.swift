@@ -1,6 +1,11 @@
 // swift-tools-version:5.10
 import PackageDescription
 
+// qpdf und libjpeg-turbo werden von Scripts/fetch-qpdf.sh aus Quellcode gebaut und nach Vendor/qpdf gelegt.
+// Vendor/ ist nicht im Repo.
+// Fehlt Vendor/qpdf, meldet Sources/QPDFKit/QPDFKit.cc das beim Bauen mit einem Hinweis auf das Skript.
+let vendor = Context.packageDirectory + "/Vendor/qpdf"
+
 let package = Package(
     name: "PDFToMe",
     platforms: [.macOS(.v14)],
@@ -9,10 +14,21 @@ let package = Package(
         .executable(name: "PDFToMeApp", targets: ["PDFToMeApp"]),
     ],
     targets: [
+        // C-Schnittstelle zu qpdf (C++), statisch gelinkt.
+        .target(
+            name: "QPDFKit",
+            cxxSettings: [.unsafeFlags(["-I", vendor + "/include"])],
+            linkerSettings: [
+                .unsafeFlags(["-L", vendor + "/lib"]),
+                .linkedLibrary("qpdf"),
+                .linkedLibrary("jpeg"),
+                .linkedLibrary("z"),
+            ]),
         // Die gesamte Logik, testbar und ohne Oberfläche.
-        .target(name: "PDFToMeCore"),
-        // SwiftUI/AppKit-App, bleibt dünn.
+        .target(name: "PDFToMeCore", dependencies: ["QPDFKit"]),
+        // AppKit/SwiftUI-App, bleibt dünn.
         .executableTarget(name: "PDFToMeApp", dependencies: ["PDFToMeCore"]),
-        .testTarget(name: "PDFToMeCoreTests", dependencies: ["PDFToMeCore"]),
-    ]
+        .testTarget(name: "PDFToMeCoreTests", dependencies: ["PDFToMeCore", "QPDFKit"]),
+    ],
+    cxxLanguageStandard: .cxx17
 )

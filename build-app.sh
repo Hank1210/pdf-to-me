@@ -7,6 +7,9 @@ cd "$(dirname "$0")"
 mkdir -p build.noindex
 [[ -L build ]] || ln -s build.noindex build
 
+# qpdf und libjpeg-turbo aus Quellcode bauen, falls noch nicht geschehen (braucht beim ersten Mal Internet und cmake).
+./Scripts/fetch-qpdf.sh
+
 swift build -c release --product PDFToMeApp
 
 APP="build/PDF to me.app"
