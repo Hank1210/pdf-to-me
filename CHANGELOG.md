@@ -6,7 +6,7 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 
 ## [Unreleased]
 
-## [1.0.0] - unreleased
+## [1.0.0] - 2026-11-18
 
 First public version.
 
@@ -40,3 +40,6 @@ First public version.
 - Universal app for Apple silicon and Intel, macOS 14 or later.
 - Community build: ad hoc signed, not notarized, published as a zip file with a SHA-256 checksum.
 - German and English user interface.
+
+[Unreleased]: https://github.com/Hank1210/pdf-to-me/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Hank1210/pdf-to-me/releases/tag/v1.0.0

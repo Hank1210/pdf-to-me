@@ -8,7 +8,7 @@ or split one into several.
 The app needs no account, no cloud storage and no subscription. Your documents stay on your Mac, and your original
 files are never changed.
 
-> **Status:** in development. This README describes version 1, which has not been released yet.
+> **Status:** version 1.0.0 is available on [GitHub Releases](https://github.com/Hank1210/pdf-to-me/releases).
 
 PDF to me is the sister app of [Scan to me](https://github.com/Hank1210/scan-to-me).
 
