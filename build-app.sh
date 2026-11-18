@@ -21,8 +21,16 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 mkdir -p "$APP/Contents/Resources/de.lproj" "$APP/Contents/Resources/en.lproj"
 cp "$(swift build -c release "${ARCHS[@]}" --show-bin-path)/PDFToMeApp" "$APP/Contents/MacOS/PDFToMeApp"
 cp Support/PDFToMe-Info.plist "$APP/Contents/Info.plist"
-# Das App-Symbol folgt später; bis dahin zeigt macOS das Standardsymbol.
-[[ -f Support/AppIcon.icns ]] && cp Support/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# App-Symbol: wird aus Scripts/make-icon.swift gezeichnet, nicht als Binärdatei im Repo abgelegt.
+ICONSET="build.noindex/AppIcon.iconset"
+rm -rf "$ICONSET"
+mkdir -p "$ICONSET"
+swift Scripts/make-icon.swift "build.noindex/AppIcon-1024.png"
+for px in 16 32 128 256 512; do
+    sips -z $px $px "build.noindex/AppIcon-1024.png" --out "$ICONSET/icon_${px}x${px}.png" >/dev/null
+    sips -z $((px * 2)) $((px * 2)) "build.noindex/AppIcon-1024.png" --out "$ICONSET/icon_${px}x${px}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 xattr -cr "$APP"
 codesign --force --sign - "$APP"
 
