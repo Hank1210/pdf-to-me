@@ -1,4 +1,5 @@
 import CryptoKit
+import DocKit
 import ImageIO
 import PDFKit
 import UniformTypeIdentifiers

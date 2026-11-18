@@ -1,5 +1,6 @@
 import CoreGraphics
 import CryptoKit
+import DocKit
 import Foundation
 import ImageIO
 import PDFKit

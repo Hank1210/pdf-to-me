@@ -1,3 +1,4 @@
+import DocKit
 import Foundation
 
 /// Der Arbeitsstand eines Fensters: Quellen, die Liste der Ergebnisseiten und die Undo- und Redo-Stapel.

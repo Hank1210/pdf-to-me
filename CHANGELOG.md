@@ -6,6 +6,10 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 
 ## [Unreleased]
 
+### Internal
+
+- The language selection now comes from DocKit, the package shared with Scan to me. No change for users.
+
 ## [1.0.0] - 2026-11-18
 
 First public version.

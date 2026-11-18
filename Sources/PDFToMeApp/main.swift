@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFToMeCore
 
 // Klassischer AppKit-Ablauf statt SwiftUI-`App`: Dokumente laufen über NSDocument und NSDocumentController

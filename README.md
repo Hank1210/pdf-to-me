@@ -150,7 +150,9 @@ Details are in [PRIVACY.md](PRIVACY.md).
 ## Building from source
 
 The project is a Swift package without an Xcode project. It uses Swift, SwiftUI and AppKit. The only third-party
-components are qpdf and libjpeg-turbo (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+components are qpdf and libjpeg-turbo (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Code shared with Scan to
+me lives in [DocKit](https://github.com/Hank1210/doc-kit), a separate Swift package under the MIT license that the
+Swift Package Manager downloads during the first build.
 `Scripts/fetch-qpdf.sh` downloads their source code once, checks it against pinned SHA-256 checksums and builds
 static libraries into `Vendor/`, which is not part of the repository. This first build needs an internet connection
 and [CMake](https://cmake.org) (`brew install cmake`).

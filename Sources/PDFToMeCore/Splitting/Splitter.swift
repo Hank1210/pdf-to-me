@@ -1,3 +1,4 @@
+import DocKit
 import Foundation
 
 /// Ein Teil beim Teilen: Seiten `first…last` (ab 1) in der aktuellen Reihenfolge des Dokuments.

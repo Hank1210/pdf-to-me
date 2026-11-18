@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFToMeCore
 
 /// Bietet beim Start an, ungesicherte Arbeit nach einem Absturz wiederherzustellen (README: „Unsaved work survives

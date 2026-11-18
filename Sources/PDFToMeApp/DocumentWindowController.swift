@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFKit
 import PDFToMeCore
 import SwiftUI

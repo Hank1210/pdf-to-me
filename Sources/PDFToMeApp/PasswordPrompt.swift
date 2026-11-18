@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFToMeCore
 
 /// Fragt nach dem Passwort einer geschützten PDF. Das Passwort bleibt nur im Speicher (README).

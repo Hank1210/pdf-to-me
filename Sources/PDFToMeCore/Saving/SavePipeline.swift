@@ -1,4 +1,5 @@
 import Darwin
+import DocKit
 import Foundation
 
 /// Ergebnis eines erfolgreichen Speicherns.

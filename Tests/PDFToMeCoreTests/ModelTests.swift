@@ -1,3 +1,4 @@
+import DocKit
 import XCTest
 @testable import PDFToMeCore
 

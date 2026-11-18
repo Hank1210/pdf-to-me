@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFToMeCore
 
 /// Speichern, Extrahieren und Teilen aus Sicht der Oberfläche: fragt, was nötig ist, und meldet das Ergebnis.

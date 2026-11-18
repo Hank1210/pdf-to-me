@@ -1,4 +1,5 @@
 import AppKit
+import DocKit
 import PDFToMeCore
 
 /// Aktionen der Dokumentfenster. Menüeinträge schicken sie an die Responder-Kette (Ziel `nil`);

@@ -1,3 +1,4 @@
+import DocKit
 import Foundation
 
 /// Dateinamen für gespeicherte Dateien. Nie überschreibend: Ist ein Name vergeben, wird nummeriert.

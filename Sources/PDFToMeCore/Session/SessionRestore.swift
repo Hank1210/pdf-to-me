@@ -1,3 +1,4 @@
+import DocKit
 import Foundation
 
 /// Ein Problem mit einer Quelle beim Wiederherstellen. Gemeldet werden nur Quellen, die noch Seiten im Dokument

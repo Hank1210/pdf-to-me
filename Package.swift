@@ -13,6 +13,11 @@ let package = Package(
         .library(name: "PDFToMeCore", targets: ["PDFToMeCore"]),
         .executable(name: "PDFToMeApp", targets: ["PDFToMeApp"]),
     ],
+    dependencies: [
+        // Gemeinsamer Code mit Scan to me (Lokalisierung, später Texterkennung).
+        // Vorerst lokal; mit der ersten DocKit-Version über die URL eingebunden.
+        .package(path: "../doc-kit"),
+    ],
     targets: [
         // C-Schnittstelle zu qpdf (C++), statisch gelinkt.
         .target(
@@ -25,10 +30,10 @@ let package = Package(
                 .linkedLibrary("z"),
             ]),
         // Die gesamte Logik, testbar und ohne Oberfläche.
-        .target(name: "PDFToMeCore", dependencies: ["QPDFKit"]),
+        .target(name: "PDFToMeCore", dependencies: ["QPDFKit", .product(name: "DocKit", package: "doc-kit")]),
         // AppKit/SwiftUI-App, bleibt dünn.
-        .executableTarget(name: "PDFToMeApp", dependencies: ["PDFToMeCore"]),
-        .testTarget(name: "PDFToMeCoreTests", dependencies: ["PDFToMeCore", "QPDFKit"]),
+        .executableTarget(name: "PDFToMeApp", dependencies: ["PDFToMeCore", .product(name: "DocKit", package: "doc-kit")]),
+        .testTarget(name: "PDFToMeCoreTests", dependencies: ["PDFToMeCore", "QPDFKit", .product(name: "DocKit", package: "doc-kit")]),
     ],
     cxxLanguageStandard: .cxx17
 )
