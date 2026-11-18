@@ -126,7 +126,7 @@ enum MainMenu {
                           "i", [.command, .option]))
         menu.addItem(item(loc("Seiten extrahieren …", "Extract Pages…"),
                           #selector(DocumentActions.extractSelectedPages(_:)), "e", [.command, .option]))
-        menu.addItem(item(loc("Teilen …", "Split…"), #selector(DocumentActions.splitDocument(_:)), "t",
+        menu.addItem(item(loc("Aufteilen …", "Split…"), #selector(DocumentActions.splitDocument(_:)), "t",
                           [.command, .option]))
         return menu
     }

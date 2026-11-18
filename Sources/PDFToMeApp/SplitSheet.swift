@@ -26,7 +26,7 @@ struct SplitSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(loc("Dokument teilen", "Split Document")).font(.headline)
+            Text(loc("Dokument aufteilen", "Split Document")).font(.headline)
             Text(loc("Jeder Teil wird als eigene Datei neben dem Original gespeichert. Die Seitenzahlen beziehen "
                      + "sich auf die aktuelle Reihenfolge (\(pageCount) Seiten).",
                      "Each part is saved as a separate file next to the original. Page numbers refer to the current "
@@ -60,7 +60,7 @@ struct SplitSheet: View {
                 Spacer()
                 Button(loc("Abbrechen", "Cancel"), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(loc("Teilen", "Split")) {
+                Button(loc("Aufteilen", "Split")) {
                     if case let .success(parts) = parts { onSplit(parts) }
                 }
                 .keyboardShortcut(.defaultAction)

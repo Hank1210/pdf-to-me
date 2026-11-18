@@ -133,7 +133,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
             return button(identifier, loc("Dateien einfügen", "Insert Files"), "doc.badge.plus",
                           #selector(insertFiles(_:)))
         case ItemID.split:
-            return button(identifier, loc("Teilen", "Split"), "scissors", #selector(splitDocument(_:)))
+            return button(identifier, loc("Aufteilen", "Split"), "scissors", #selector(splitDocument(_:)))
         case ItemID.save:
             return button(identifier, loc("Als Kopie speichern", "Save as Copy"), "square.and.arrow.down",
                           #selector(saveCopy(_:)))
