@@ -1,6 +1,10 @@
 # PDF to me
 
-**Read. Annotate. Organize.**
+<p align="center">
+  <img src="https://github.com/Hank1210/pdf-to-me/releases/download/v1.0.0/PDF-to-me-icon.png" width="160" alt="PDF to me app icon">
+</p>
+
+<p align="center"><strong>Read. Annotate. Organize.</strong></p>
 
 A native macOS app for everyday work with PDFs. Read documents, rearrange their pages, merge several files into one
 or split one into several.
