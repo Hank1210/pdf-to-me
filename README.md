@@ -105,11 +105,15 @@ Store.
 4. Open the app. macOS will say it cannot verify the developer.
 5. Go to System Settings → Privacy & Security and click "Open Anyway".
 
-macOS may ask again after an update. Your settings and unsaved work are kept.
+macOS may ask again after an update. The app's data is kept.
+
+Step-by-step instructions, including updating and uninstalling, are in
+[COMMUNITY_INSTALLATION_EN.md](COMMUNITY_INSTALLATION_EN.md) (German: [COMMUNITY_INSTALLATION.md](COMMUNITY_INSTALLATION.md)).
 
 You can also build the app yourself (see [Building from source](#building-from-source)).
 
-There is no automatic updater. New versions are published on GitHub Releases.
+There is no automatic updater. New versions are published on GitHub Releases; changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Privacy and security
 
@@ -121,7 +125,9 @@ There is no automatic updater. New versions are published on GitHub Releases.
 - **Passwords** for protected PDFs are kept in memory only and never written to disk.
 
 - **Diagnostic log.** The log at `~/Library/Logs/PDF-to-me/pdf-to-me.log` records what the app does and which
-  errors occur. It never records document content or passwords.
+  errors occur. It never records document content, file names or passwords.
+
+Details are in [PRIVACY.md](PRIVACY.md).
 
 ## Troubleshooting
 
@@ -148,14 +154,19 @@ and [CMake](https://cmake.org) (`brew install cmake`).
 ```sh
 ./Scripts/fetch-qpdf.sh    # once: builds qpdf and libjpeg-turbo into Vendor/
 swift test                 # unit tests
-./build-app.sh             # builds "build/PDF to me.app" with an ad hoc signature
+./build-app.sh             # builds "build/PDF to me.app" (universal, ad hoc signature)
 ```
+
+`./Scripts/make-release.sh` runs the tests, builds the app and creates the release zip file with its `.sha256` file
+in `build/`.
 
 | Path | Contents |
 | --- | --- |
 | `Sources/PDFToMeCore/` | All logic, covered by tests: document model, page operations, saving and checks |
 | `Sources/QPDFKit/` | C interface to qpdf |
 | `Scripts/fetch-qpdf.sh` | Downloads, verifies and builds qpdf and libjpeg-turbo |
+| `Scripts/make-icon.swift` | Draws the app icon during the build |
+| `Scripts/make-release.sh` | Creates the release zip file and its checksum |
 | `Sources/PDFToMeApp/` | User interface, kept thin |
 | `Tests/PDFToMeCoreTests/` | Tests, including a corpus of test PDFs |
 
