@@ -13,6 +13,7 @@
 #include <qpdf/QPDFPageDocumentHelper.hh>
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
+#include <qpdf/Pl_Discard.hh>
 
 #include <cstring>
 #include <functional>
@@ -320,6 +321,26 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
                                              true);
         }
         writer.write();
+        return QK_OK;
+    } catch (std::exception &exception) {
+        return fail(exception, error, error_length);
+    }
+}
+
+QKStatus qk_check(const char *path, const char *password, int *page_count, int *warnings, char *error,
+                  size_t error_length) {
+    try {
+        QPDF pdf;
+        pdf.setSuppressWarnings(true);
+        pdf.processFile(path, password);
+        *page_count = int(QPDFPageDocumentHelper(pdf).getAllPages().size());
+        // Alles einmal ins Leere schreiben: liest jedes Objekt und dekodiert die Datenströme (wie qpdf --check).
+        Pl_Discard discard;
+        QPDFWriter writer(pdf);
+        writer.setOutputPipeline(&discard);
+        writer.setDecodeLevel(qpdf_dl_generalized);
+        writer.write();
+        *warnings = int(pdf.getWarnings().size());
         return QK_OK;
     } catch (std::exception &exception) {
         return fail(exception, error, error_length);

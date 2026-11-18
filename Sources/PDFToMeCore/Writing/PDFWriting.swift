@@ -24,8 +24,9 @@ public struct WriteOptions: Sendable {
 
 /// Schreibt einen Plan als neue PDF-Datei.
 ///
-/// Umsetzungen: `PDFKitWriter` (Übergang bis M1b), `PDFiumWriter` (Ziel). Ein Writer schreibt nur an eine Stelle, an
-/// der noch keine Datei liegt; Zielnamen, Prüfung und atomares Verschieben übernimmt die Speicher-Pipeline.
+/// Umsetzung: `QPDFKitWriter` (qpdf). `PDFDocument.write` wird nie zum Speichern benutzt. Ein Writer schreibt nur an
+/// eine Stelle, an der noch keine Datei liegt; Zielnamen, Prüfung und atomares Verschieben übernimmt die
+/// Speicher-Pipeline.
 public protocol PDFWriting {
     var capabilities: WriterCapabilities { get }
 

@@ -98,7 +98,7 @@ final class TestCorpus {
     /// `Jane Doe`) und einem angekreuzten Kontrollkästchen `agree`, beide im Formularverzeichnis `/AcroForm /Fields`.
     ///
     /// Von Hand als PDF-Text geschrieben: Mit PDFKit erzeugte Formulare haben kein `/AcroForm` und taugen deshalb
-    /// nicht als Prüfstein (so wurde der Formularfehler des `PDFKitWriter` lange übersehen).
+    /// nicht als Prüfstein (so wurde der Formularfehler des früheren `PDFKitWriter` lange übersehen).
     @discardableResult
     func formPDF(named name: String = "Form") throws -> URL {
         let marker = Self.marker(name, page: 1)

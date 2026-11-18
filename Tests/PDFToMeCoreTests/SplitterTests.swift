@@ -104,7 +104,7 @@ final class SplitterSaveTests: XCTestCase {
     }
 
     private func split(
-        _ parts: [SplitPart], writer: any PDFWriting = PDFKitWriter(), options: WriteOptions = WriteOptions()
+        _ parts: [SplitPart], writer: any PDFWriting = QPDFKitWriter(), options: WriteOptions = WriteOptions()
     ) -> [Splitter.PartResult] {
         Splitter.save(
             plan, contents: contents, parts: parts, in: output, stem: "Contract",
@@ -216,7 +216,7 @@ private struct FailingForPageWriter: PDFWriting {
         if plan.pages.contains(where: { $0.source == source && $0.index == index }) {
             try Data("garbage".utf8).write(to: url)
         } else {
-            try PDFKitWriter().compose(plan, contents: contents, to: url, options: options)
+            try QPDFKitWriter().compose(plan, contents: contents, to: url, options: options)
         }
     }
 }

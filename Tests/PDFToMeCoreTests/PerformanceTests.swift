@@ -53,7 +53,7 @@ final class PerformanceTests: XCTestCase {
         let output = corpus.url("Output")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         XCTAssertLessThan(try seconds("save and check 500 pages") {
-            _ = try SavePipeline(writer: PDFKitWriter()).save(
+            _ = try SavePipeline(writer: QPDFKitWriter()).save(
                 document.plan, contents: document.contents, in: output, baseName: "Large (edited)")
         }, 10)
     }

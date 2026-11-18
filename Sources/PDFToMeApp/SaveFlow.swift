@@ -5,8 +5,8 @@ import PDFToMeCore
 /// Geschrieben und geprüft wird im Core (`SavePipeline`, `Splitter`).
 @MainActor
 enum SaveFlow {
-    /// Writer in M1a. Ab M1b `PDFiumWriter`.
-    static var pipeline: SavePipeline { SavePipeline(writer: PDFKitWriter()) }
+    /// Writer ab M1b: qpdf, strukturerhaltend (Links, Inhaltsverzeichnis, Formularfelder).
+    static var pipeline: SavePipeline { SavePipeline(writer: QPDFKitWriter()) }
 
     // MARK: Speichern
 

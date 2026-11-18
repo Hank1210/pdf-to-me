@@ -46,6 +46,11 @@ void qk_add_page(QKComposer *composer, int source, int page_index, int rotation)
 QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, char *error,
                   size_t error_length);
 
+/// Prüft eine PDF-Datei wie `qpdf --check`: öffnen (mit `password`, darf NULL sein), alle Objekte lesen und alle
+/// Datenströme dekodieren. Schreibt die Seitenzahl nach `page_count` und die Zahl der Warnungen nach `warnings`.
+QKStatus qk_check(const char *path, const char *password, int *page_count, int *warnings, char *error,
+                  size_t error_length);
+
 #ifdef __cplusplus
 }
 #endif

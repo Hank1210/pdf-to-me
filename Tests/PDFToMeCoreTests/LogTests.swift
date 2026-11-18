@@ -98,7 +98,7 @@ final class LogTests: XCTestCase {
         let plan = try DocumentPlan(source: loaded.source)
         let output = corpus.url("Output")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        _ = try SavePipeline(writer: PDFKitWriter()).save(
+        _ = try SavePipeline(writer: QPDFKitWriter()).save(
             plan, contents: [loaded.source.id: loaded.content], in: output, baseName: "\(secretName) (edited)",
             options: WriteOptions(password: "geheim-4711"))
         _ = RestoredSession(try JSONDecoder().decode(DocumentPlan.self, from: JSONEncoder().encode(plan)))

@@ -5,11 +5,11 @@ import XCTest
 
 /// Rundlauf-Tests: Plan bauen, schreiben, die Datei frisch öffnen und vergleichen.
 ///
-/// Laufen gegen jeden Writer in `writers`; alle müssen dieselben Tests bestehen (Ausnahme: der bekannte
-/// Formularfehler des `PDFKitWriter`).
+/// Laufen gegen jeden Writer in `writers`; alle müssen dieselben Tests bestehen. (Bis M1b lief hier auch der
+/// `PDFKitWriter`; er ist entfernt, weil er das Formularverzeichnis verlor.)
 final class WriterRoundTripTests: XCTestCase {
     private let writers: [(name: String, writer: any PDFWriting)] = [
-        ("PDFKit", PDFKitWriter()), ("qpdf", QPDFKitWriter()),
+        ("qpdf", QPDFKitWriter()),
     ]
 
     private var corpus: TestCorpus!
@@ -142,14 +142,7 @@ final class WriterRoundTripTests: XCTestCase {
         for entry in writers {
             let url = corpus.url("Fillable-\(entry.name).pdf")
             try entry.writer.compose(plan, contents: contents, to: url, options: WriteOptions())
-            let check = { XCTAssertEqual(FormFields.names(at: url, password: nil), ["name", "agree"], entry.name) }
-            if entry.writer is PDFKitWriter {
-                // Bekannter Fehler: PlanAssembler kopiert in ein neues PDFDocument, dabei geht /AcroForm verloren.
-                // Behoben mit dem qpdf-Writer (M1b); bis dahin lehnt die Prüf-Pipeline solche Dateien ab.
-                XCTExpectFailure("PDFKitWriter verliert /AcroForm", options: .nonStrict()) { check() }
-            } else {
-                check()
-            }
+            XCTAssertEqual(FormFields.names(at: url, password: nil), ["name", "agree"], entry.name)
         }
     }
 
@@ -233,6 +226,6 @@ final class WriterRoundTripTests: XCTestCase {
     }
 
     func testCapabilities() {
-        XCTAssertTrue(PDFKitWriter().capabilities.contains(.pageOperations))
+        XCTAssertTrue(QPDFKitWriter().capabilities.contains(.pageOperations))
     }
 }

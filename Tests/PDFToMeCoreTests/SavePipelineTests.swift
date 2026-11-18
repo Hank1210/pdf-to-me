@@ -65,7 +65,7 @@ final class SavePipelineTests: XCTestCase {
     }
 
     private func save(
-        with writer: any PDFWriting = PDFKitWriter(), baseName: String = "Contract (edited)",
+        with writer: any PDFWriting = QPDFKitWriter(), baseName: String = "Contract (edited)",
         options: WriteOptions = WriteOptions()
     ) throws -> SaveResult {
         try SavePipeline(writer: writer)
@@ -138,12 +138,12 @@ final class SavePipelineTests: XCTestCase {
         XCTAssertEqual(try save().url.lastPathComponent, "Contract (edited).pdf")
     }
 
-    /// Ein Writer, der das Formularverzeichnis verliert (heute der PDFKitWriter), wird von der Prüfung erkannt:
+    /// Ein Writer, der das Formularverzeichnis verliert (wie bis M1b der PDFKitWriter), wird von der Prüfung erkannt:
     /// Es wird nichts gespeichert, und die Meldung nennt die Felder.
     func testUnfillableFormsAreRejected() throws {
         try add(corpus.pdf(named: "Cover", pages: 1))
         try add(corpus.formPDF())
-        XCTAssertThrowsError(try save(with: PDFKitWriter())) {
+        XCTAssertThrowsError(try save(with: BrokenWriter.dropFormDirectory)) {
             guard case let .verificationFailed(failures, _)? = $0 as? SaveError else { return XCTFail("\($0)") }
             XCTAssertEqual(failures, [.formFieldsNotFillable(missing: ["agree", "name"])])
         }
@@ -288,6 +288,9 @@ final class ProtectionSuggestionTests: XCTestCase {
 /// Writer, die absichtlich fehlerhafte Dateien schreiben, um die Prüfung zu testen.
 private enum BrokenWriter: PDFWriting, CustomStringConvertible {
     case garbage, dropLastPage, swapFirstTwoPages, stripLinks, stripOutline, stripFormFields, wrongPassword
+    /// Schreibt das in ein neues `PDFDocument` zusammengesetzte Dokument: Die Widgets bleiben, das
+    /// Formularverzeichnis geht verloren (der Fehler des früheren PDFKitWriter).
+    case dropFormDirectory
 
     var capabilities: WriterCapabilities { [.pageOperations] }
     var description: String { "\(self as Any)" }
@@ -322,7 +325,7 @@ private enum BrokenWriter: PDFWriting, CustomStringConvertible {
                 guard let page = document.page(at: index) else { continue }
                 page.annotations.filter { $0.type == "Widget" }.forEach(page.removeAnnotation)
             }
-        case .garbage, .wrongPassword, .dropLastPage, .swapFirstTwoPages:
+        case .garbage, .wrongPassword, .dropLastPage, .swapFirstTwoPages, .dropFormDirectory:
             break
         }
         var writeOptions: [PDFDocumentWriteOption: Any] = [:]

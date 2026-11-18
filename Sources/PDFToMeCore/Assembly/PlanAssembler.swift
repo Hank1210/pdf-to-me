@@ -15,8 +15,9 @@ public struct AssembledDocument {
 
 /// Setzt aus einem Plan und den geladenen Quellen ein `PDFDocument` im Speicher zusammen.
 ///
-/// Grundlage für die Vorschau und für den `PDFKitWriter`. Seiten werden strukturell kopiert, nie neu gezeichnet:
-/// Text, Links, Anmerkungen und Formularfelder bleiben erhalten. Die Quelldokumente werden nicht verändert.
+/// Grundlage für die Vorschau (zum Schreiben dient `QPDFKitWriter`). Seiten werden strukturell kopiert, nie neu
+/// gezeichnet: Text, Links, Anmerkungen und Formularfelder bleiben erhalten. Die Quelldokumente werden nicht
+/// verändert.
 ///
 /// - Interne Links werden auf die Seiten des neuen Dokuments umgeschrieben. Zeigt ein Link auf eine Seite, die
 ///   nicht im Ergebnis steht, wird er entfernt; der Text bleibt.

@@ -2,8 +2,10 @@ import Foundation
 import PDFKit
 
 /// Ein Grund, warum eine geschriebene Datei die Prüfung nicht besteht. Seitenangaben ab 1.
-public enum VerificationFailure: Equatable, Sendable {
+public enum VerificationFailure: Error, Equatable, Sendable {
     case cannotOpen
+    /// PDFKit kann die Datei öffnen, qpdf findet aber Fehler im Aufbau.
+    case notReadableByQPDF
     case wrongPassword
     case pageCount(expected: Int, actual: Int)
     case textMismatch(page: Int)
@@ -17,6 +19,7 @@ public enum VerificationFailure: Equatable, Sendable {
     var logName: StaticString {
         switch self {
         case .cannotOpen: "cannotOpen"
+        case .notReadableByQPDF: "notReadableByQPDF"
         case .wrongPassword: "wrongPassword"
         case .pageCount: "pageCount"
         case .textMismatch: "textMismatch"
@@ -31,6 +34,9 @@ public enum VerificationFailure: Equatable, Sendable {
         switch self {
         case .cannotOpen:
             loc("Die neue Datei lässt sich nicht öffnen.", "The new file cannot be opened.")
+        case .notReadableByQPDF:
+            loc("Die neue Datei ist fehlerhaft aufgebaut und lässt sich nicht in jedem PDF-Programm öffnen.",
+                "The new file is malformed and cannot be opened by every PDF app.")
         case .wrongPassword:
             loc("Die neue Datei lässt sich mit dem gewählten Passwort nicht öffnen.",
                 "The new file cannot be opened with the chosen password.")
@@ -93,6 +99,18 @@ public enum SaveVerifier {
         let reference = expected.document
         guard written.pageCount == reference.pageCount else {
             return [.pageCount(expected: reference.pageCount, actual: written.pageCount)]
+        }
+        // Zweite, unabhängige Leseprobe mit qpdf.
+        switch QPDFCheck.run(url, password: password) {
+        case let .failure(failure):
+            return [failure]
+        case let .success(check):
+            guard check.pageCount == reference.pageCount else {
+                return [.pageCount(expected: reference.pageCount, actual: check.pageCount)]
+            }
+            if check.warnings > 0 {
+                Log.shared.warning("qpdf check warnings", ["plan": .id(plan.id), "warnings": .int(check.warnings)])
+            }
         }
 
         var failures: [VerificationFailure] = []
