@@ -15,8 +15,8 @@ let package = Package(
     ],
     dependencies: [
         // Gemeinsamer Code mit Scan to me (Lokalisierung, später Texterkennung).
-        // Vorerst lokal; mit der ersten DocKit-Version über die URL eingebunden.
-        .package(path: "../doc-kit"),
+        // Lokal mitentwickeln: swift package edit doc-kit --path ../doc-kit
+        .package(url: "https://github.com/Hank1210/doc-kit.git", from: "1.0.0"),
     ],
     targets: [
         // C-Schnittstelle zu qpdf (C++), statisch gelinkt.
