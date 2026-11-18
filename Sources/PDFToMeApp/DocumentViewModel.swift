@@ -11,6 +11,7 @@ protocol PageCommands: AnyObject {
     func rotatePages(_ ids: [PageRef.ID], by rotation: Rotation)
     func deletePages(_ ids: [PageRef.ID])
     func extractPages(_ ids: [PageRef.ID])
+    func printPages(_ ids: [PageRef.ID])
 }
 
 /// Zustand eines Dokumentfensters für die Ansichten. Die Logik liegt im Core (`WorkingDocument`, `DocumentSearch`);

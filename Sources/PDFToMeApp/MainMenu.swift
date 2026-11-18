@@ -16,6 +16,7 @@ import PDFToMeCore
     func insertFiles(_ sender: Any?)
     func rotateLeft(_ sender: Any?)
     func rotateRight(_ sender: Any?)
+    func printSelectedPages(_ sender: Any?)
 }
 
 /// Das Hauptmenü, im Code aufgebaut (die App hat keine Nib-Dateien). Alle Texte zweisprachig über `loc`.
@@ -68,11 +69,13 @@ enum MainMenu {
         menu.addItem(submenu(recent))
         menu.addItem(.separator())
         menu.addItem(item(loc("Schließen", "Close"), #selector(NSWindow.performClose(_:)), "w"))
-        menu.addItem(item(loc("Als Kopie sichern …", "Save as Copy…"), #selector(DocumentActions.saveCopy(_:)), "s"))
+        menu.addItem(item(loc("Als Kopie speichern …", "Save as Copy…"), #selector(DocumentActions.saveCopy(_:)), "s"))
         menu.addItem(.separator())
         menu.addItem(item(loc("Papierformat …", "Page Setup…"), #selector(NSDocument.runPageLayout(_:)), "p",
                           [.command, .shift]))
         menu.addItem(item(loc("Drucken …", "Print…"), #selector(NSDocument.printDocument(_:)), "p"))
+        menu.addItem(item(loc("Auswahl drucken …", "Print Selected Pages…"),
+                          #selector(DocumentActions.printSelectedPages(_:)), "p", [.command, .option]))
         return menu
     }
 

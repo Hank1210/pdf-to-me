@@ -13,9 +13,9 @@ enum SessionRecovery {
 
         let names = stored.sessions.map { $0.sources.first?.displayName ?? AppIdentity.name }
         let alert = NSAlert()
-        alert.messageText = loc("Ungesicherte Arbeit wiederherstellen?", "Restore unsaved work?")
+        alert.messageText = loc("Ungespeicherte Arbeit wiederherstellen?", "Restore unsaved work?")
         alert.informativeText = loc(
-            "PDF to me wurde beendet, bevor diese Änderungen gesichert waren:",
+            "PDF to me wurde beendet, bevor diese Änderungen gespeichert waren:",
             "PDF to me quit before these changes were saved:")
             + "\n\n" + names.map { "• \($0)" }.joined(separator: "\n")
         alert.addButton(withTitle: loc("Wiederherstellen", "Restore"))
@@ -113,11 +113,12 @@ enum SessionRecovery {
         guard !files.isEmpty else { return }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = loc("Gesicherte Arbeit ist beschädigt", "Saved work is damaged")
+        alert.messageText = loc("Ungespeicherte Arbeit ist beschädigt", "Unsaved work is damaged")
         alert.informativeText = loc(
-            "\(files.count) gesicherte Arbeitsstände lassen sich nicht lesen und nicht wiederherstellen. "
-            + "Ihre Originaldateien sind davon nicht betroffen.",
-            "\(files.count) saved work states cannot be read or restored. Your original files are not affected.")
+            "\(files.count) Arbeitsstände mit ungespeicherten Änderungen lassen sich nicht lesen und nicht "
+            + "wiederherstellen. Ihre Originaldateien sind davon nicht betroffen.",
+            "\(files.count) work states with unsaved changes cannot be read or restored. Your original files are "
+            + "not affected.")
         alert.addButton(withTitle: loc("Löschen", "Delete"))
         alert.addButton(withTitle: loc("Behalten", "Keep"))
         if alert.runModal() == .alertFirstButtonReturn {

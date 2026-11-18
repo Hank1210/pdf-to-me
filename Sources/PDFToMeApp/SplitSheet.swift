@@ -48,8 +48,8 @@ struct SplitSheet: View {
                     .textFieldStyle(.roundedBorder)
             case .everyN:
                 Stepper(value: $pagesPerPart, in: 1...max(pageCount, 1)) {
-                    Text(loc("Alle \(pagesPerPart) \(pagesPerPart == 1 ? "Seite" : "Seiten")",
-                             "Every \(pagesPerPart) \(pagesPerPart == 1 ? "page" : "pages")"))
+                    Text(loc("Je \(pagesPerPart) \(pagesPerPart == 1 ? "Seite" : "Seiten") pro Datei",
+                             "\(pagesPerPart) \(pagesPerPart == 1 ? "page" : "pages") per file"))
                 }
             }
 

@@ -135,7 +135,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         case ItemID.split:
             return button(identifier, loc("Teilen", "Split"), "scissors", #selector(splitDocument(_:)))
         case ItemID.save:
-            return button(identifier, loc("Als Kopie sichern", "Save as Copy"), "square.and.arrow.down",
+            return button(identifier, loc("Als Kopie speichern", "Save as Copy"), "square.and.arrow.down",
                           #selector(saveCopy(_:)))
         case ItemID.search:
             let item = NSSearchToolbarItem(itemIdentifier: identifier)
@@ -225,6 +225,25 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
     @objc func delete(_ sender: Any?) { deletePages(model.targetPageIDs) }
 
     func extractSelectedPages(_ sender: Any?) { extractPages(model.targetPageIDs) }
+    func printSelectedPages(_ sender: Any?) { printPages(model.targetPageIDs) }
+
+    /// Druckt nur die gewählten Seiten in Dokumentreihenfolge (README: „selected pages“).
+    func printPages(_ ids: [PageRef.ID]) {
+        guard let window, let pdfDocument, let working = pdfDocument.working, !ids.isEmpty else { return }
+        do {
+            let selection = try working.plan.extracting(ids)
+            let document = try PlanAssembler.assemble(selection, contents: working.contents).document
+            guard let operation = document.printOperation(
+                for: pdfDocument.printInfo, scalingMode: .pageScaleToFit, autoRotate: true)
+            else { return }
+            operation.jobTitle = working.displayName
+            operation.printPanel.options.formUnion([.showsCopies, .showsPreview, .showsOrientation, .showsScaling,
+                                                    .showsPaperSize])
+            operation.runModal(for: window, delegate: nil, didRun: nil, contextInfo: nil)
+        } catch {
+            pdfDocument.presentErrorSheet(error)
+        }
+    }
 
     func insertFiles(_ sender: Any?) {
         guard let urls = FileImport.chooseFiles() else { return }
@@ -288,7 +307,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         let hasPages = !model.pageIDs.isEmpty
         switch menuItem.action {
         case #selector(rotateLeft(_:)), #selector(rotateRight(_:)), #selector(delete(_:)),
-             #selector(extractSelectedPages(_:)):
+             #selector(extractSelectedPages(_:)), #selector(printSelectedPages(_:)):
             return hasPages
         case #selector(saveCopy(_:)), #selector(splitDocument(_:)):
             return hasPages

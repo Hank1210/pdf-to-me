@@ -104,13 +104,13 @@ final class PDFToMeDocument: NSDocument {
             return
         }
         let alert = NSAlert()
-        alert.messageText = loc("Möchten Sie Ihre Änderungen an „\(displayName ?? "")“ als neue Datei sichern?",
+        alert.messageText = loc("Möchten Sie Ihre Änderungen an „\(displayName ?? "")“ als neue Datei speichern?",
                                 "Do you want to save your changes to “\(displayName ?? "")” as a new file?")
         alert.informativeText = loc("Ihr Original bleibt in jedem Fall unverändert.",
                                     "Your original stays unchanged in any case.")
-        alert.addButton(withTitle: loc("Sichern …", "Save…"))
+        alert.addButton(withTitle: loc("Speichern …", "Save…"))
         alert.addButton(withTitle: loc("Abbrechen", "Cancel"))
-        let discard = alert.addButton(withTitle: loc("Nicht sichern", "Don’t Save"))
+        let discard = alert.addButton(withTitle: loc("Nicht speichern", "Don’t Save"))
         discard.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [self] response in
             switch response {

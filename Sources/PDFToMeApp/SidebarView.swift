@@ -86,6 +86,7 @@ private struct ThumbnailList: View {
         Button(loc("Nach rechts drehen", "Rotate Right")) { model.commands?.rotatePages(ids, by: .quarter) }
         Divider()
         Button(loc("Extrahieren …", "Extract…")) { model.commands?.extractPages(ids) }
+        Button(loc("Drucken …", "Print…")) { model.commands?.printPages(ids) }
         Divider()
         Button(loc("Löschen", "Delete"), role: .destructive) { model.commands?.deletePages(ids) }
     }
