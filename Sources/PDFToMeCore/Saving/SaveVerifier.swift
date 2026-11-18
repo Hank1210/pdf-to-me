@@ -114,9 +114,19 @@ public enum SaveVerifier {
         }
 
         var failures: [VerificationFailure] = []
+        // Text: gegen eine frische, unabhängige Lesung der Original-Bytes, nicht gegen die Kopie aus der Vorschau.
+        // Kopierte PDFKit-Seiten teilen Daten mit der angezeigten Quelle; ihre Textauslese ist kein sicherer Maßstab.
+        let originals = freshSources(plan: plan, contents: contents)
         for index in textSamplePositions(plan) {
-            guard let original = reference.page(at: index), let copy = written.page(at: index) else { continue }
-            if normalized(original.string) != normalized(copy.string) {
+            let ref = plan.pages[index]
+            guard let copy = written.page(at: index) else { continue }
+            let expectedText: String?
+            if let source = originals[ref.source] {
+                expectedText = source.page(at: ref.index)?.string
+            } else {
+                expectedText = reference.page(at: index)?.string   // Bilder: keine Original-PDF, kein Text
+            }
+            if normalized(expectedText) != normalized(copy.string) {
                 failures.append(.textMismatch(page: index + 1))
             }
         }
@@ -141,6 +151,20 @@ public enum SaveVerifier {
             failures.append(.formFieldsNotFillable(missing: missingFields.sorted()))
         }
         return failures
+    }
+
+    /// Die PDF-Quellen des Plans, neu aus ihren beim Öffnen gelesenen Bytes geöffnet (unabhängig von den
+    /// PDFKit-Objekten, die die App anzeigt), bei Bedarf entsperrt.
+    static func freshSources(plan: DocumentPlan, contents: SourceContents) -> [SourceFile.ID: PDFDocument] {
+        var documents: [SourceFile.ID: PDFDocument] = [:]
+        for source in plan.sourcesInUse {
+            guard case let .pdf(_, data) = contents[source.id], let document = PDFDocument(data: data) else { continue }
+            if document.isLocked {
+                guard let password = source.password, document.unlock(withPassword: password) else { continue }
+            }
+            documents[source.id] = document
+        }
+        return documents
     }
 
     /// Felder, die in einer Quelle im Formularverzeichnis stehen und deren Widget auf einer übernommenen Seite liegt.
