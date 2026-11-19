@@ -263,6 +263,12 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         afterRecognition { SaveFlow.saveCopy(of: pdfDocument, window: window) }
     }
 
+    /// Wie „Als Kopie speichern“, aber mit Bildern auf 150 dpi als JPEG; meldet die Größe vorher und nachher.
+    func saveReduced(_ sender: Any?) {
+        guard let pdfDocument, let window else { return }
+        afterRecognition { SaveFlow.saveCopy(of: pdfDocument, window: window, reduceImages: true) }
+    }
+
     func splitDocument(_ sender: Any?) {
         afterRecognition { [weak self] in self?.showSplitSheet() }
     }
@@ -398,7 +404,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         case #selector(rotateLeft(_:)), #selector(rotateRight(_:)), #selector(delete(_:)),
              #selector(extractSelectedPages(_:)), #selector(printSelectedPages(_:)):
             return hasPages
-        case #selector(saveCopy(_:)), #selector(splitDocument(_:)):
+        case #selector(saveCopy(_:)), #selector(saveReduced(_:)), #selector(splitDocument(_:)):
             return hasPages
         case #selector(recognizeTextInDocument(_:)), #selector(recognizeTextOnSelectedPages(_:)):
             return hasPages && recognitionTask == nil

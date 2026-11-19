@@ -12,6 +12,7 @@ import PDFToMeCore
     func zoomToFit(_ sender: Any?)
     func toggleTwoPages(_ sender: Any?)
     func saveCopy(_ sender: Any?)
+    func saveReduced(_ sender: Any?)
     func splitDocument(_ sender: Any?)
     func extractSelectedPages(_ sender: Any?)
     func insertFiles(_ sender: Any?)
@@ -73,6 +74,8 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item(loc("Schließen", "Close"), #selector(NSWindow.performClose(_:)), "w"))
         menu.addItem(item(loc("Als Kopie speichern …", "Save as Copy…"), #selector(DocumentActions.saveCopy(_:)), "s"))
+        menu.addItem(item(loc("Verkleinert speichern …", "Save Reduced…"), #selector(DocumentActions.saveReduced(_:)),
+                          "s", [.command, .option]))
         menu.addItem(.separator())
         menu.addItem(item(loc("Papierformat …", "Page Setup…"), #selector(NSDocument.runPageLayout(_:)), "p",
                           [.command, .shift]))

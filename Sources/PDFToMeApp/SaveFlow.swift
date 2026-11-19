@@ -12,17 +12,21 @@ enum SaveFlow {
     // MARK: Speichern
 
     /// Speichert das ganze Dokument als neue Datei neben dem Original, z. B. `Vertrag (bearbeitet).pdf`.
-    /// `true`, wenn gespeichert wurde.
+    /// Mit `reduceImages` werden die Bilder verkleinert (`Vertrag (verkleinert).pdf`), und die Meldung nennt die
+    /// Größe ohne und mit Verkleinerung. `true`, wenn gespeichert wurde.
     @discardableResult
-    static func saveCopy(of document: PDFToMeDocument, window: NSWindow, reportResult: Bool = true) -> Bool {
+    static func saveCopy(of document: PDFToMeDocument, window: NSWindow, reportResult: Bool = true,
+                         reduceImages: Bool = false) -> Bool {
         guard let working = document.working else { return false }
-        let baseName = FileNaming.editedBaseName(forOriginal: working.displayName)
-        guard let result = save(working.plan, contents: working.contents, folder: working.defaultFolder,
-                                baseName: baseName, textLayers: working.recognitionCache, window: window)
+        let baseName = reduceImages ? FileNaming.reducedBaseName(forOriginal: working.displayName)
+                                    : FileNaming.editedBaseName(forOriginal: working.displayName)
+        guard let (result, sizes) = save(working.plan, contents: working.contents, folder: working.defaultFolder,
+                                         baseName: baseName, textLayers: working.recognitionCache,
+                                         reduceImages: reduceImages, window: window)
         else { return false }
         document.updateChangeCount(.changeCleared)
         working.discardSession()
-        if reportResult { report([result], window: window) }
+        if reportResult { report([result], sizes: sizes, window: window) }
         return true
     }
 
@@ -32,8 +36,8 @@ enum SaveFlow {
             let plan = try working.plan.extracting(ids)
             let positions = ids.compactMap { working.plan.position(of: $0) }
             let baseName = Splitter.extractBaseName(stem: working.stem, positions: positions)
-            if let result = save(plan, contents: working.contents, folder: working.defaultFolder,
-                                 baseName: baseName, textLayers: working.recognitionCache, window: window) {
+            if let (result, _) = save(plan, contents: working.contents, folder: working.defaultFolder,
+                                      baseName: baseName, textLayers: working.recognitionCache, window: window) {
                 report([result], window: window)
             }
         } catch {
@@ -67,16 +71,26 @@ enum SaveFlow {
     // MARK: Ablauf
 
     /// Fragt bei Bedarf nach dem Passwortschutz und dem Ordner, speichert und zeigt Fehler an. `nil` bei Abbruch
-    /// oder Fehler.
+    /// oder Fehler. Mit `reduceImages` kommt der Größenvergleich mit; fehlt er, war die Vergleichsdatei nicht zu
+    /// schreiben, gespeichert ist trotzdem.
     private static func save(_ plan: DocumentPlan, contents: SourceContents, folder: URL?, baseName: String,
-                             textLayers: TextRecognitionCache, window: NSWindow) -> SaveResult? {
+                             textLayers: TextRecognitionCache, reduceImages: Bool = false,
+                             window: NSWindow) -> (SaveResult, SizeComparison?)? {
         guard var options = writeOptions(for: plan, window: window),
               var folder = self.folder(folder, window: window)
         else { return nil }
         options.textLayers = textLayers
+        options.reduceImages = reduceImages
         while true {
             do {
-                return try pipeline.save(plan, contents: contents, in: folder, baseName: baseName, options: options)
+                let result = try pipeline.save(plan, contents: contents, in: folder, baseName: baseName,
+                                               options: options)
+                guard reduceImages else { return (result, nil) }
+                let before = try? pipeline.unreducedSize(plan, contents: contents, near: folder, options: options)
+                let after = (try? FileManager.default.attributesOfItem(atPath: result.url.path)[.size] as? NSNumber)?
+                    .int64Value
+                guard let before, let after else { return (result, nil) }
+                return (result, SizeComparison(before: before, after: after))
             } catch SaveError.cannotWrite {
                 // Ordner nicht beschreibbar: einen anderen wählen lassen.
                 guard let other = chooseFolder(
@@ -145,7 +159,8 @@ enum SaveFlow {
 
     // MARK: Meldungen
 
-    private static func report(_ saved: [SaveResult], failures: [String] = [], window: NSWindow) {
+    private static func report(_ saved: [SaveResult], failures: [String] = [], sizes: SizeComparison? = nil,
+                               window: NSWindow) {
         let alert = NSAlert()
         let names = saved.map { "„\($0.url.lastPathComponent)“" }
         let namesEN = saved.map { "“\($0.url.lastPathComponent)”" }
@@ -159,6 +174,7 @@ enum SaveFlow {
             alert.messageText = loc("\(saved.count) Dateien gespeichert.", "\(saved.count) files saved.")
         }
         var details: [String] = []
+        if let sizes { details.append(sizes.message) }
         if saved.count > 1 { details.append(names.joined(separator: "\n")) }
         if !failures.isEmpty {
             alert.alertStyle = .warning
