@@ -288,6 +288,84 @@ final class ImageReductionTests: XCTestCase {
         XCTAssertLessThan(try size(twice), try size(once) * 3 / 2)
     }
 
+    /// Ein fotoähnliches RGB-Bild: Verlauf, viele farbige Kreise, leichtes Rauschen. Immer gleich (fester Startwert).
+    private func photo(width: Int, height: Int) throws -> CGImage {
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        var seed: UInt32 = 7
+        func next() -> CGFloat {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            return CGFloat(seed >> 8) / CGFloat(1 << 24)
+        }
+        let gradient = try XCTUnwrap(CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [CGColor(red: 0.15, green: 0.35, blue: 0.6, alpha: 1),
+                     CGColor(red: 0.75, green: 0.6, blue: 0.3, alpha: 1)] as CFArray, locations: nil))
+        context.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: height), options: [])
+        for _ in 0..<400 {
+            let size = 20 + next() * 200
+            context.setFillColor(CGColor(red: next(), green: next(), blue: next(), alpha: 0.85))
+            context.fillEllipse(in: CGRect(x: next() * CGFloat(width), y: next() * CGFloat(height),
+                                           width: size, height: size))
+        }
+        let data = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+        for index in 0..<(width * height * 4) where index % 4 != 3 {
+            seed = seed &* 1_664_525 &+ 1_013_904_223
+            data[index] = UInt8(clamping: Int(data[index]) + Int(seed >> 29) - 4)
+        }
+        return try XCTUnwrap(context.makeImage())
+    }
+
+    private func rgbPixels(_ image: CGImage) throws -> Data {
+        let context = try XCTUnwrap(CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let rgba = try XCTUnwrap(context.data).assumingMemoryBound(to: UInt8.self)
+        var rgb = Data(count: image.width * image.height * 3)
+        rgb.withUnsafeMutableBytes { buffer in
+            for pixel in 0..<(image.width * image.height) {
+                for channel in 0..<3 { buffer[pixel * 3 + channel] = rgba[pixel * 4 + channel] }
+            }
+        }
+        return rgb
+    }
+
+    /// Die Qualität entspricht „JPEG 75“ nach libjpeg (0,53 Bit je Pixel bei diesem Bild), nicht der gut
+    /// doppelt so großen ImageIO-Stufe 0,75 (1,31 Bit je Pixel). Ändert Apple die Skala, schlägt dieser Test an.
+    func testJPEGSizeMatchesQuality75() throws {
+        let image = try photo(width: 1755, height: 1687)
+        let jpeg = try XCTUnwrap(ImageReduction.jpeg(
+            pixels: rgbPixels(image), width: 1755, height: 1687, components: 3, targetWidth: 1755, targetHeight: 1687))
+        let bitsPerPixel = Double(jpeg.count * 8) / Double(1755 * 1687)
+        XCTAssertLessThan(bitsPerPixel, 0.8, "JPEG zu groß: \(bitsPerPixel) Bit je Pixel")
+    }
+
+    /// Ein gewöhnliches JPEG-Foto mit 186 dpi (wie in vielen Berichten) wird verkleinert und kleiner.
+    func testJPEGPhotoAt186DpiGetsSmaller() throws {
+        // Quelle als JPEG in der üblichen Qualität, seitenfüllend auf A4: 2194 Pixel auf 842 pt sind 187 dpi.
+        let source = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(source, "public.jpeg" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, try photo(width: 1556, height: 2194),
+                                   [kCGImageDestinationLossyCompressionQuality: ImageReduction.jpegQuality] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let jpegSource = try XCTUnwrap(CGImageSourceCreateWithData(source as CFData, nil))
+        let image = try XCTUnwrap(CGImageSourceCreateImageAtIndex(jpegSource, 0, nil))
+        let url = corpus.url("Foto.pdf")
+        try corpus.writePDF(to: url) { context in
+            TestCorpus.beginPage(context, size: TestCorpus.a4)
+            context.draw(image, in: CGRect(origin: .zero, size: TestCorpus.a4))
+            context.endPDFPage()
+        }
+        let (plan, contents) = try load(url)
+        let plain = try write(plan, contents, reduce: false)
+        let reduced = try write(plan, contents, reduce: true)
+        XCTAssertEqual(try images(plain, page: 0).values.first?.filter, "DCTDecode", "Quelle ist kein JPEG")
+        XCTAssertEqual(try images(reduced, page: 0).values.first?.height, 1755)
+        XCTAssertLessThan(Double(try size(reduced)), Double(try size(plain)) * 0.85)
+    }
+
     // MARK: Meldung und Name
 
     func testSizeComparisonMessage() {

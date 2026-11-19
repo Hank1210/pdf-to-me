@@ -3,7 +3,8 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Bilder verkleinern beim Speichern („Verkleinert speichern“): auf höchstens 150 dpi, als JPEG mit Qualität 75 %.
+/// Bilder verkleinern beim Speichern („Verkleinert speichern“): auf höchstens 150 dpi, als JPEG mit Qualität 75 %
+/// (nach der üblichen libjpeg-Skala).
 ///
 /// Die Regeln stehen hier, die Mechanik (Bilder finden, dekodieren, ersetzen) in der qpdf-Brücke. Gemessen wird
 /// vorsichtig an der ganzen Seite: Ein Bild behält höchstens so viele Pixel, wie 150 dpi über die längere Seite
@@ -11,7 +12,10 @@ import UniformTypeIdentifiers
 /// wird nie zu grob. Text, Links, Formulare und Textebenen bleiben unberührt, nur Bilddaten werden ersetzt.
 public enum ImageReduction {
     public static let dpi: Double = 150
-    public static let jpegQuality: Double = 0.75
+    /// Qualität für ImageIO. Dessen Skala ist eine andere als die übliche von libjpeg: ImageIO 0,5 ergibt etwa so
+    /// große Dateien wie libjpeg 75 („JPEG 75 %“), ImageIO 0,75 gut doppelt so große. Gemessen an einem
+    /// fotoähnlichen Bild; `testJPEGSizeMatchesQuality75` wacht darüber.
+    public static let jpegQuality: Double = 0.5
     /// Erst ab diesem Verhältnis über der Grenze wird verkleinert. Knapp darüber lohnt das erneute Kodieren nicht.
     static let tolerance: Double = 1.1
 
