@@ -171,6 +171,8 @@ public enum AssemblyError: Error, Equatable, LocalizedError {
     case pageMissing(fileName: String, page: Int)
     case copyFailed
     case imagePageFailed
+    /// Die Textebene einer erkannten Seite ließ sich nicht erzeugen.
+    case textLayerFailed
 
     public var errorDescription: String? {
         switch self {
@@ -182,6 +184,9 @@ public enum AssemblyError: Error, Equatable, LocalizedError {
             loc("Eine Seite ließ sich nicht kopieren.", "A page could not be copied.")
         case .imagePageFailed:
             loc("Aus einem Bild ließ sich keine Seite erzeugen.", "A page could not be created from an image.")
+        case .textLayerFailed:
+            loc("Die Textebene einer erkannten Seite ließ sich nicht erzeugen.",
+                "The text layer of a recognized page could not be created.")
         }
     }
 }

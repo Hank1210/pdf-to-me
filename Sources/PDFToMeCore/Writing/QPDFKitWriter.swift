@@ -6,7 +6,8 @@ import QPDFKit
 /// Seiten werden strukturell aus den Quell-Bytes kopiert, nie neu gezeichnet. Erhalten bleiben Text, Anmerkungen,
 /// interne Links (auf Seiten im Ergebnis umgeschrieben, sonst entfernt), das Inhaltsverzeichnis (aus den Quellen
 /// neu aufgebaut) und Formularfelder samt Formularverzeichnis. Die neue Datei kann mit AES-256 geschützt werden.
-/// Bilder werden zuerst mit `ImagePage.pdfData` zu einer einseitigen PDF.
+/// Bilder werden zuerst mit `ImagePage.pdfData` zu einer einseitigen PDF. Seiten mit Texterkennung bekommen eine
+/// unsichtbare Textebene, die qpdf über die unveränderte Seite legt.
 public struct QPDFKitWriter: PDFWriting {
     public let capabilities: WriterCapabilities = [.pageOperations]
 
@@ -60,9 +61,34 @@ public struct QPDFKitWriter: PDFWriting {
                 indices[source.id] = index
             }
 
-            for page in plan.pages {
-                guard let index = indices[page.source] else { continue }
-                qk_add_page(composer, index, Int32(page.index), Int32(page.rotation.degrees))
+            var overlays: [TextRecognitionCache.Key: Int32] = [:]
+            for (position, page) in plan.pages.enumerated() {
+                guard let index = indices[page.source], let source = plan.source(of: page) else { continue }
+                guard page.recognizesText else {
+                    qk_add_page(composer, index, Int32(page.index), Int32(page.rotation.degrees))
+                    continue
+                }
+                let key = TextRecognitionCache.Key(source: source, page: page)
+                if overlays[key] == nil {
+                    guard let recognized = options.textLayers?[key] else {
+                        throw WriterError.textNotRecognized(page: position + 1)
+                    }
+                    guard let size = TextLayerPage.displayedSize(of: contents[source.id], pageIndex: page.index) else {
+                        throw AssemblyError.pageMissing(fileName: source.displayName, page: page.index + 1)
+                    }
+                    let data = try TextLayerPage.pdfData(recognized, size: size)
+                    var overlay: Int32 = -1
+                    let status = try Self.call { error, length in
+                        data.withUnsafeBytes { bytes in
+                            qk_add_overlay(composer, bytes.baseAddress, bytes.count, &overlay, error, length)
+                        }
+                    }
+                    guard status.code == QK_OK else {
+                        throw WriterError.engineFailed(fileName: fileName, reason: status.message)
+                    }
+                    overlays[key] = overlay
+                }
+                qk_add_page_with_overlay(composer, index, Int32(page.index), Int32(page.rotation.degrees), overlays[key]!)
             }
 
             let status = try Self.call { error, length in

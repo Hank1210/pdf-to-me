@@ -38,6 +38,12 @@ struct PageSpec {
     int source;
     int index;
     int rotation;
+    int overlay = -1;   // Index in QKComposer::overlays, -1 = keine
+};
+
+struct Overlay {
+    std::string bytes;   // muss leben, solange die QPDF-Instanz liest
+    std::shared_ptr<QPDF> pdf;
 };
 
 struct OutlineItem {
@@ -79,8 +85,45 @@ void setLinkDestination(QPDFObjectHandle annotation, QPDFObjectHandle destinatio
 
 struct QKComposer {
     std::vector<std::unique_ptr<Source>> sources;
+    std::vector<std::unique_ptr<Overlay>> overlays;
     std::vector<PageSpec> pages;
 };
+
+namespace {
+
+/// Legt die Formular-XObject-Fassung einer Überlagerung über `page`, wie `qpdf --overlay`. Ändert nie Objekte, die
+/// andere Seiten mitbenutzen könnten: Ressourcen und Inhaltsliste bekommen eigene Kopien.
+void placeOverlay(QPDFObjectHandle page, QPDFObjectHandle form) {
+    QPDFPageObjectHelper helper(page);
+    auto resources = page.getKey("/Resources");
+    resources = resources.isDictionary() ? resources.shallowCopy() : QPDFObjectHandle::newDictionary();
+    auto xobjects = resources.getKey("/XObject");
+    xobjects = xobjects.isDictionary() ? xobjects.shallowCopy() : QPDFObjectHandle::newDictionary();
+    int suffix = 0;
+    std::string name = resources.getUniqueResourceName("/Fx", suffix);
+    xobjects.replaceKey(name, form);
+    resources.replaceKey("/XObject", xobjects);
+    page.replaceKey("/Resources", resources);
+
+    // In den sichtbaren Ausschnitt einpassen; die eigene Drehung der Seite wird ausgeglichen
+    // (invert_transformations), damit die Überlagerung so steht, wie die Seite angezeigt wird.
+    auto box = helper.getCropBox(false).getArrayAsRectangle();
+    std::string placed = helper.placeFormXObject(form, name, box, true, true, true);
+
+    // Bisherigen Inhalt einklammern (q … Q), damit ein offener Grafikzustand die Überlagerung nicht verschiebt.
+    auto &pdf = page.getQPDF();
+    std::vector<QPDFObjectHandle> contents{pdf.newStream("q\n")};
+    auto old = page.getKey("/Contents");
+    if (old.isArray()) {
+        for (auto &item : old.aitems()) contents.push_back(item);
+    } else if (old.isStream()) {
+        contents.push_back(old);
+    }
+    contents.push_back(pdf.newStream("\nQ\n" + placed));
+    page.replaceKey("/Contents", QPDFObjectHandle::newArray(contents));
+}
+
+}  // namespace
 
 const char *qpdfkit_version(void) {
     return QPDF::QPDFVersion().c_str();
@@ -126,6 +169,31 @@ void qk_add_page(QKComposer *composer, int source, int page_index, int rotation)
     composer->pages.push_back({source, page_index, rotation});
 }
 
+QKStatus qk_add_overlay(QKComposer *composer, const void *bytes, size_t length, int *index, char *error,
+                        size_t error_length) {
+    try {
+        auto overlay = std::make_unique<Overlay>();
+        overlay->bytes.assign(static_cast<const char *>(bytes), length);
+        overlay->pdf = std::make_shared<QPDF>();
+        overlay->pdf->setSuppressWarnings(true);
+        std::string description = "overlay " + std::to_string(composer->overlays.size() + 1);
+        overlay->pdf->processMemoryFile(description.c_str(), overlay->bytes.data(), overlay->bytes.size());
+        if (QPDFPageDocumentHelper(*overlay->pdf).getAllPages().empty()) {
+            copyMessage("overlay has no page", error, error_length);
+            return QK_FAILED;
+        }
+        composer->overlays.push_back(std::move(overlay));
+        *index = int(composer->overlays.size()) - 1;
+        return QK_OK;
+    } catch (std::exception &exception) {
+        return fail(exception, error, error_length);
+    }
+}
+
+void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, int rotation, int overlay) {
+    composer->pages.push_back({source, page_index, rotation, overlay});
+}
+
 QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, char *error,
                   size_t error_length) {
     try {
@@ -134,6 +202,10 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
             if (spec.source < 0 || size_t(spec.source) >= sources.size() || spec.index < 0 ||
                 size_t(spec.index) >= sources[size_t(spec.source)]->pages.size()) {
                 copyMessage("page reference out of range", error, error_length);
+                return QK_FAILED;
+            }
+            if (spec.overlay < -1 || spec.overlay >= int(composer->overlays.size())) {
+                copyMessage("overlay reference out of range", error, error_length);
                 return QK_FAILED;
             }
         }
@@ -148,16 +220,22 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
         std::map<std::pair<int, QPDFObjGen>, QPDFObjectHandle> firstCopy;
         std::vector<std::pair<QPDFObjectHandle, int>> copied;   // Kopie und ihre Quelle, in Planreihenfolge
         std::set<QPDFObjGen> used;
+        // Unveränderte Vorlage jeder kopierten Seite. Weitere Vorkommen derselben Seite entstehen aus ihr, nicht aus
+        // der schon gedrehten oder überlagerten ersten Kopie. Die Vorlage selbst gelangt nicht in die Datei.
+        std::map<QPDFObjGen, QPDFObjectHandle> pristine;
+        std::map<int, QPDFObjectHandle> overlayForms;   // je Überlagerung ein Formular-XObject in der neuen Datei
         bool needAppearances = false;
         for (auto &spec : composer->pages) {
             auto &source = *sources[size_t(spec.source)];
             auto original = source.pages[size_t(spec.index)].getObjectHandle();
             auto copy = out.copyForeignObject(original);
             bool duplicate = !used.insert(copy.getObjGen()).second;
-            if (duplicate) {
+            if (!duplicate) {
+                pristine.emplace(copy.getObjGen(), QPDFPageObjectHelper(copy).shallowCopyPage().getObjectHandle());
+            } else {
                 // Eine Seite zum zweiten Mal: eigene Seite mit eigenen Anmerkungen (eine Anmerkung gehört zu genau
                 // einer Seite).
-                copy = QPDFPageObjectHelper(copy).shallowCopyPage().getObjectHandle();
+                copy = QPDFPageObjectHelper(pristine.at(copy.getObjGen())).shallowCopyPage().getObjectHandle();
                 used.insert(copy.getObjGen());
                 auto annotations = copy.getKey("/Annots");
                 if (annotations.isArray()) {
@@ -177,6 +255,19 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
                 // qpdf um).
                 outForms.fixCopiedAnnotations(copy, original, *source.forms);
                 if (source.forms->getNeedAppearances()) needAppearances = true;
+            }
+            // Erst überlagern, dann drehen: Die Überlagerung passt zur Seite, wie die Quelle sie anzeigt, und dreht
+            // sich danach mit ihr.
+            if (spec.overlay >= 0) {
+                auto form = overlayForms.find(spec.overlay);
+                if (form == overlayForms.end()) {
+                    auto overlayPage = QPDFPageDocumentHelper(*composer->overlays[size_t(spec.overlay)]->pdf)
+                                           .getAllPages()
+                                           .front();
+                    auto foreign = overlayPage.getFormXObjectForPage(true);
+                    form = overlayForms.emplace(spec.overlay, out.copyForeignObject(foreign)).first;
+                }
+                placeOverlay(copy, form->second);
             }
             if (spec.rotation % 360 != 0) page.rotatePage(spec.rotation, true);
             firstCopy.emplace(std::make_pair(spec.source, original.getObjGen()), copy);

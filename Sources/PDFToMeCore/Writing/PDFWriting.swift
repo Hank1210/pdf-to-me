@@ -17,9 +17,13 @@ public struct WriterCapabilities: OptionSet, Sendable {
 public struct WriteOptions: Sendable {
     /// Schützt die neue Datei mit diesem Passwort (Öffnen und Rechte). `nil`: ohne Passwort.
     public var password: String?
+    /// Ergebnisse der Texterkennung für Seiten mit `PageRef.recognizesText`. Fehlt für eine solche Seite das
+    /// Ergebnis, schreibt der Writer nicht (`WriterError.textNotRecognized`): Die Erkennung läuft vorher.
+    public var textLayers: TextRecognitionCache?
 
-    public init(password: String? = nil) {
+    public init(password: String? = nil, textLayers: TextRecognitionCache? = nil) {
         self.password = password
+        self.textLayers = textLayers
     }
 }
 
@@ -44,6 +48,8 @@ public enum WriterError: Error, Equatable, LocalizedError {
     case sourceUnreadable(fileName: String, reason: String)
     /// Der Writer meldet einen Fehler; `reason` ist seine (englische) Beschreibung.
     case engineFailed(fileName: String, reason: String)
+    /// Seite `page` (ab 1) soll eine Textebene bekommen, ihr Text ist aber noch nicht erkannt.
+    case textNotRecognized(page: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -59,6 +65,8 @@ public enum WriterError: Error, Equatable, LocalizedError {
                 "“\(name)” could not be read while saving (\(reason)).")
         case let .engineFailed(name, reason):
             loc("„\(name)“ ließ sich nicht schreiben (\(reason)).", "“\(name)” could not be written (\(reason)).")
+        case let .textNotRecognized(page):
+            loc("Der Text auf Seite \(page) ist noch nicht erkannt.", "The text on page \(page) has not been recognized yet.")
         }
     }
 }

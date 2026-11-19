@@ -10,6 +10,8 @@ public enum VerificationFailure: Error, Equatable, Sendable {
     case wrongPassword
     case pageCount(expected: Int, actual: Int)
     case textMismatch(page: Int)
+    /// Die Seite sollte eine Textebene aus der Texterkennung haben, ihr Text fehlt aber.
+    case recognizedTextMissing(page: Int)
     case linksMissing(page: Int, expected: Int, actual: Int)
     case formFieldsMissing(page: Int, expected: [String], actual: [String])
     case outlineMissing(expected: Int, actual: Int)
@@ -24,6 +26,7 @@ public enum VerificationFailure: Error, Equatable, Sendable {
         case .wrongPassword: "wrongPassword"
         case .pageCount: "pageCount"
         case .textMismatch: "textMismatch"
+        case .recognizedTextMissing: "recognizedTextMissing"
         case .linksMissing: "linksMissing"
         case .formFieldsMissing: "formFieldsMissing"
         case .outlineMissing: "outlineMissing"
@@ -47,6 +50,8 @@ public enum VerificationFailure: Error, Equatable, Sendable {
         case let .textMismatch(page):
             loc("Der Text auf Seite \(page) stimmt nicht mit dem Original überein.",
                 "The text on page \(page) does not match the original.")
+        case let .recognizedTextMissing(page):
+            loc("Auf Seite \(page) fehlt der erkannte Text.", "The recognized text is missing on page \(page).")
         case let .linksMissing(page, expected, actual):
             loc("Auf Seite \(page) fehlen Links (\(actual) statt \(expected)).",
                 "Links are missing on page \(page) (\(actual) instead of \(expected)).")
@@ -91,7 +96,8 @@ public enum SaveVerifier {
 
     /// Prüft und gibt alle gefundenen Fehler zurück; leer heißt bestanden.
     public static func failures(
-        of url: URL, expected: AssembledDocument, plan: DocumentPlan, contents: SourceContents, password: String?
+        of url: URL, expected: AssembledDocument, plan: DocumentPlan, contents: SourceContents, password: String?,
+        textLayers: TextRecognitionCache? = nil
     ) -> [VerificationFailure] {
         guard let written = PDFDocument(url: url) else { return [.cannotOpen] }
         if written.isLocked {
@@ -118,7 +124,7 @@ public enum SaveVerifier {
         // Text: gegen eine frische, unabhängige Lesung der Original-Bytes, nicht gegen die Kopie aus der Vorschau.
         // Kopierte PDFKit-Seiten teilen Daten mit der angezeigten Quelle; ihre Textauslese ist kein sicherer Maßstab.
         let originals = freshSources(plan: plan, contents: contents)
-        for index in textSamplePositions(plan) {
+        for index in textSamplePositions(plan) where !plan.pages[index].recognizesText {
             let ref = plan.pages[index]
             guard let copy = written.page(at: index) else { continue }
             let expectedText: String?
@@ -129,6 +135,17 @@ public enum SaveVerifier {
             }
             if normalized(expectedText) != normalized(copy.string) {
                 failures.append(.textMismatch(page: index + 1))
+            }
+        }
+        // Erkannte Seiten: alle, nicht nur Stichproben. Jede erkannte Zeile muss im Text der Seite stehen; die
+        // Reihenfolge kann PDFKit beim Auslesen anders wählen.
+        for (index, ref) in plan.pages.enumerated() where ref.recognizesText {
+            guard let source = plan.source(of: ref) else { continue }
+            let recognized = textLayers?[TextRecognitionCache.Key(source: source, page: ref)]
+            let text = normalized(written.page(at: index)?.string)
+            let lines = (recognized?.lines ?? []).map { normalized($0.text) }.filter { !$0.isEmpty }
+            if recognized == nil || !lines.allSatisfy(text.contains) {
+                failures.append(.recognizedTextMissing(page: index + 1))
             }
         }
         for index in 0..<reference.pageCount {

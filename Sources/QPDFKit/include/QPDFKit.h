@@ -40,6 +40,16 @@ int qk_source_page_count(QKComposer *composer, int source);
 /// von 90). Dieselbe Seite darf mehrfach vorkommen.
 void qk_add_page(QKComposer *composer, int source, int page_index, int rotation);
 
+/// Fügt eine Überlagerung hinzu: eine PDF, deren erste Seite über Seiten gelegt werden kann (z. B. eine
+/// unsichtbare Textebene). Die Bytes werden kopiert. Schreibt den Index der Überlagerung nach `index`.
+QKStatus qk_add_overlay(QKComposer *composer, const void *bytes, size_t length, int *index, char *error,
+                        size_t error_length);
+
+/// Wie `qk_add_page`, legt aber die Überlagerung `overlay` über die Seite: eingepasst in den sichtbaren Ausschnitt
+/// (CropBox) und so, dass sie zur Seite steht, wie die Quelle sie anzeigt (eigenes /Rotate). Die zusätzliche
+/// Drehung `rotation` dreht Seite und Überlagerung gemeinsam. Der Inhalt der Seite bleibt unverändert.
+void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, int rotation, int overlay);
+
 /// Setzt die Seiten zusammen und schreibt die neue Datei nach `path`. `password` (darf NULL sein) schützt sie mit
 /// AES-256. Die Metadaten (Titel, Autor, Thema, Stichwörter) kommen aus der ersten Quelle, als Ersteller steht
 /// `creator`.
