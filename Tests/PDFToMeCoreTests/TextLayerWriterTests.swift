@@ -224,4 +224,27 @@ final class TextLayerWriterTests: XCTestCase {
         // Die Überschrift steht oben auf der Seite.
         XCTAssertGreaterThan(try bounds(of: "Stromrechnung", in: url).midY, 700)
     }
+
+    /// Eine realistische Seite: mehrere lange Zeilen, Umlaute, ß, Ligaturen, Euro, Prozent, Anführungszeichen.
+    /// Jede erkannte Zeile muss vollständig in der gespeicherten Datei stehen. Früher fehlte bei hohen Zeilen das
+    /// Ende, weil die Textebene waagerecht gestaucht war (behoben in DocKit 1.0.1).
+    func testRealisticPageKeepsEveryRecognizedLine() async throws {
+        try requireTextRecognition()
+        let lines = [
+            "Stadtwerke Musterstadt GmbH Rechnung",
+            "Grüße aus der Straße, offiziell geprüft",
+            "Betrag: 1.234,56 € (inkl. 19 % MwSt.)",
+            "Datum 18.11.2026 Kunde 4711",
+            "„Zitat“ – Gedankenstrich … Ende",
+            "Fläche Effizienz Auflage Offizier",
+        ]
+        let document = try WorkingDocument(
+            opening: corpus.scannedTextPDF(named: "Rechnung", pages: [lines]), sessionStore: nil)
+        try document.markForTextRecognition(document.plan.pages.map(\.id))
+        try await TextRecognitionRun.run(document.pendingRecognition, cache: document.recognitionCache)
+        // Die Speicher-Pipeline prüft jede erkannte Zeile; schlägt sie fehl, wirft `save`.
+        let url = try save(document)
+        let text = (PDFDocument(url: url)?.page(at: 0)?.string ?? "").filter { !$0.isWhitespace }
+        XCTAssertTrue(text.contains("MwSt.)"), text)
+    }
 }
