@@ -235,7 +235,7 @@ final class TestCorpus {
         case missing(String)
     }
 
-    private func writePDF(to url: URL, password: String? = nil, draw: (CGContext) -> Void) throws {
+    func writePDF(to url: URL, password: String? = nil, draw: (CGContext) -> Void) throws {
         // Titel = Dateiname ohne Endung, damit Tests die Übernahme der Metadaten prüfen können.
         var info: [CFString: Any] = [
             kCGPDFContextCreator: "PDF to me tests",
@@ -254,7 +254,7 @@ final class TestCorpus {
         context.closePDF()
     }
 
-    private static func beginPage(_ context: CGContext, size: CGSize) {
+    static func beginPage(_ context: CGContext, size: CGSize) {
         var box = CGRect(origin: .zero, size: size)
         let boxData = Data(bytes: &box, count: MemoryLayout<CGRect>.size) as CFData
         context.beginPDFPage([kCGPDFContextMediaBox: boxData] as CFDictionary)

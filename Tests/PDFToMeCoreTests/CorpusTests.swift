@@ -134,4 +134,19 @@ final class CorpusTests: XCTestCase {
         corpus.remove()
         XCTAssertFalse(FileManager.default.fileExists(atPath: corpus.directory.path))
     }
+
+    /// Scan-Seiten tragen ihren Text nur als Bild; gedreht und mit Ausschnitt, wenn verlangt.
+    func testScannedTextPDFHasNoTextLayer() throws {
+        let plain = try XCTUnwrap(PDFDocument(url: corpus.scannedTextPDF(named: "S1", pages: [["Eins"], ["Zwei"]])))
+        XCTAssertEqual(plain.pageCount, 2)
+        XCTAssertTrue((plain.page(at: 0)?.string ?? "").isEmpty)
+
+        let turned = try XCTUnwrap(PDFDocument(url: corpus.scannedTextPDF(named: "S2", pages: [["Quer"]], rotated: true)))
+        XCTAssertEqual(turned.page(at: 0)?.rotation, 90)
+        XCTAssertEqual(turned.page(at: 0)?.bounds(for: .mediaBox).size, TestCorpus.a4Landscape)
+        XCTAssertTrue((turned.page(at: 0)?.string ?? "").isEmpty)
+
+        let cropped = try XCTUnwrap(PDFDocument(url: corpus.scannedTextPDF(named: "S3", pages: [["Oben"]], cropToTopHalf: true)))
+        XCTAssertEqual(cropped.page(at: 0)?.bounds(for: .cropBox).height ?? 0, TestCorpus.a4.height / 2, accuracy: 1)
+    }
 }

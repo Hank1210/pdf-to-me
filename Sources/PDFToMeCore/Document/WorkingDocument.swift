@@ -10,6 +10,8 @@ public final class WorkingDocument {
     public private(set) var contents: SourceContents
     public private(set) var preview: AssembledDocument
     public let sessionStore: SessionStore?
+    /// Ergebnisse der Texterkennung dieses Dokuments, nur im Arbeitsspeicher.
+    public let recognitionCache = TextRecognitionCache()
 
     /// Wird nach jeder übernommenen Änderung aufgerufen.
     public var onChange: (() -> Void)?
@@ -73,6 +75,24 @@ public final class WorkingDocument {
     /// Name ohne Endung für die erste Quelle, ohne Kennzeichnung als bearbeitet; Grundlage aller Zielnamen.
     public var stem: String {
         FileNaming.stem(of: displayName)
+    }
+
+    // MARK: Texterkennung
+
+    /// Merkt die Seiten aus `ids` für die Texterkennung vor, die noch keine Textebene haben, als ein Undo-Schritt.
+    /// Gibt die Zahl der neu vorgemerkten Seiten zurück; 0 heißt, alle haben schon Text oder sind vorgemerkt.
+    @discardableResult
+    public func markForTextRecognition(_ ids: [PageRef.ID]) throws -> Int {
+        let withoutText = TextRecognitionRun.pagesWithoutText(ids, plan: plan, contents: contents)
+            .filter { plan.page(withID: $0)?.recognizesText == false }
+        guard !withoutText.isEmpty else { return 0 }
+        try change { try $0.recognizeText(withoutText) }
+        return withoutText.count
+    }
+
+    /// Vorgemerkte Seiten, deren Text noch nicht erkannt ist (z. B. nach einem Neustart).
+    public var pendingRecognition: [TextRecognitionRun.Job] {
+        TextRecognitionRun.pendingJobs(plan: plan, contents: contents, cache: recognitionCache)
     }
 
     public func undo() throws { try change { try $0.undo() } }
