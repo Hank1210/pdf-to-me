@@ -20,10 +20,14 @@ public struct WriteOptions: Sendable {
     /// Ergebnisse der Texterkennung für Seiten mit `PageRef.recognizesText`. Fehlt für eine solche Seite das
     /// Ergebnis, schreibt der Writer nicht (`WriterError.textNotRecognized`): Die Erkennung läuft vorher.
     public var textLayers: TextRecognitionCache?
+    /// Verlustfrei verkleinern (Objekt-Streams, Neukomprimierung, unbenutzte Ressourcen entfernen). Inhalte, Links,
+    /// Formulare und Inhaltsverzeichnis bleiben unverändert; deshalb immer an.
+    public var compact: Bool
 
-    public init(password: String? = nil, textLayers: TextRecognitionCache? = nil) {
+    public init(password: String? = nil, textLayers: TextRecognitionCache? = nil, compact: Bool = true) {
         self.password = password
         self.textLayers = textLayers
+        self.compact = compact
     }
 }
 

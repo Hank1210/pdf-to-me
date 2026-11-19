@@ -52,9 +52,10 @@ void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, 
 
 /// Setzt die Seiten zusammen und schreibt die neue Datei nach `path`. `password` (darf NULL sein) schützt sie mit
 /// AES-256. Die Metadaten (Titel, Autor, Thema, Stichwörter) kommen aus der ersten Quelle, als Ersteller steht
-/// `creator`.
-QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, char *error,
-                  size_t error_length);
+/// `creator`. Mit `compact` ≠ 0 wird die Datei verlustfrei kompakter geschrieben: Objekt-Streams, alle Flate-Streams
+/// mit höchster Stufe neu komprimiert, unbenutzte Seitenressourcen entfernt. Inhalte bleiben unverändert.
+QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, int compact,
+                  char *error, size_t error_length);
 
 /// Prüft eine PDF-Datei wie `qpdf --check`: öffnen (mit `password`, darf NULL sein), alle Objekte lesen und alle
 /// Datenströme dekodieren. Schreibt die Seitenzahl nach `page_count` und die Zahl der Warnungen nach `warnings`.

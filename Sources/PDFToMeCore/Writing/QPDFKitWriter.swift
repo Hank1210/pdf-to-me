@@ -92,7 +92,7 @@ public struct QPDFKitWriter: PDFWriting {
             }
 
             let status = try Self.call { error, length in
-                qk_write(composer, url.path, options.password, AppIdentity.name, error, length)
+                qk_write(composer, url.path, options.password, AppIdentity.name, options.compact ? 1 : 0, error, length)
             }
             guard status.code == QK_OK else {
                 try? FileManager.default.removeItem(at: url)

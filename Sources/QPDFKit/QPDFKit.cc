@@ -14,6 +14,7 @@
 #include <qpdf/QPDFPageObjectHelper.hh>
 #include <qpdf/QPDFWriter.hh>
 #include <qpdf/Pl_Discard.hh>
+#include <qpdf/Pl_Flate.hh>
 
 #include <cstring>
 #include <functional>
@@ -123,6 +124,32 @@ void placeOverlay(QPDFObjectHandle page, QPDFObjectHandle form) {
     page.replaceKey("/Contents", QPDFObjectHandle::newArray(contents));
 }
 
+/// Entfernt aus den Ressourcen jeder Seite, was ihr Inhalt nicht benutzt. Seiten, deren Inhalt sich nicht lesen lässt,
+/// bleiben unverändert.
+void removeUnusedResources(QPDF &pdf) {
+    QPDFPageDocumentHelper pages(pdf);
+    pages.pushInheritedAttributesToPage();
+    for (auto &page : pages.getAllPages()) {
+        auto object = page.getObjectHandle();
+        auto resources = object.getKey("/Resources");
+        if (!resources.isDictionary()) continue;
+        // Eigene Kopien von /Resources und seinen Unterverzeichnissen (/Font, /XObject, …), damit gemeinsam benutzte
+        // Verzeichnisse nie für alle Seiten gekürzt werden. qpdf 12 trennt sie auch selbst; die Kopie sichert das
+        // unabhängig von der qpdf-Version ab (Test: testSharedResourcesStayCompleteForEveryPage).
+        resources = resources.shallowCopy();
+        for (auto &key : resources.getKeys()) {
+            auto category = resources.getKey(key);
+            if (category.isDictionary()) resources.replaceKey(key, category.shallowCopy());
+        }
+        object.replaceKey("/Resources", resources);
+        try {
+            page.removeUnreferencedResources();
+        } catch (std::exception &) {
+            // Inhalt nicht lesbar: Ressourcen lieber behalten.
+        }
+    }
+}
+
 }  // namespace
 
 const char *qpdfkit_version(void) {
@@ -194,8 +221,8 @@ void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, 
     composer->pages.push_back({source, page_index, rotation, overlay});
 }
 
-QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, char *error,
-                  size_t error_length) {
+QKStatus qk_write(QKComposer *composer, const char *path, const char *password, const char *creator, int compact,
+                  char *error, size_t error_length) {
     try {
         auto &sources = composer->sources;
         for (auto &spec : composer->pages) {
@@ -409,8 +436,21 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
         if (creator) info.replaceKey("/Creator", QPDFObjectHandle::newUnicodeString(creator));
         out.getTrailer().replaceKey("/Info", info);
 
-        // 5. Schreiben, auf Wunsch mit Passwort (AES-256, alle Rechte für den Besitzer des Passworts).
+        // 5. Verlustfrei verkleinern: Ressourcen, die der Inhalt einer Seite nicht benutzt, fallen weg (etwa Schriften
+        //    und Bilder anderer Seiten, mit denen eine Quellseite ihre Ressourcen teilte).
+        if (compact) removeUnusedResources(out);
+
+        // 6. Schreiben, auf Wunsch mit Passwort (AES-256, alle Rechte für den Besitzer des Passworts).
         QPDFWriter writer(out, path);
+        if (compact) {
+            // Objekt-Streams, Flate auf höchster Stufe auch für schon komprimierte Streams. Bilder in JPEG (DCT)
+            // bleiben unberührt.
+            Pl_Flate::setCompressionLevel(9);
+            writer.setObjectStreamMode(qpdf_o_generate);
+            writer.setCompressStreams(true);
+            writer.setDecodeLevel(qpdf_dl_generalized);
+            writer.setRecompressFlate(true);
+        }
         if (password && *password) {
             writer.setR6EncryptionParameters(password, password, true, true, true, true, true, true, qpdf_r3p_full,
                                              true);

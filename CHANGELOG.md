@@ -6,6 +6,12 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 
 ## [Unreleased]
 
+### Changed
+
+- Saved files are written more compactly without losing anything: objects are packed into compressed object
+  streams, streams are recompressed, and fonts or images that no page uses are left out. Text, links, form fields,
+  bookmarks and images stay exactly as they were.
+
 ### Internal
 
 - The language selection now comes from DocKit, the package shared with Scan to me. No change for users.
