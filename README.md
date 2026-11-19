@@ -7,12 +7,12 @@
 <p align="center"><strong>Read. Annotate. Organize.</strong></p>
 
 A native macOS app for everyday work with PDFs. Read documents, rearrange their pages, merge several files into one
-or split one into several.
+or split one into several. Make scanned pages searchable and files smaller.
 
 The app needs no account, no cloud storage and no subscription. Your documents stay on your Mac, and your original
 files are never changed.
 
-> **Status:** version 1.0.0 is available on [GitHub Releases](https://github.com/Hank1210/pdf-to-me/releases).
+> **Status:** version 1.1.0 is available on [GitHub Releases](https://github.com/Hank1210/pdf-to-me/releases).
 
 PDF to me is the sister app of [Scan to me](https://github.com/Hank1210/scan-to-me).
 
@@ -47,6 +47,20 @@ PDF to me is the sister app of [Scan to me](https://github.com/Hank1210/scan-to-
 
 - **Structure is kept.** Merging and splitting copy pages as they are. Outlines, links and form fields survive.
 
+### Text recognition and smaller files
+
+- **Text recognition.** Pages › Recognize Text, or the toolbar button, makes scanned pages searchable and lets you
+  select and copy their text in other apps. Recognition runs on your Mac with Apple's Vision framework. Only pages
+  without text are processed. When you save, the text is added as an invisible layer; the page looks the same as
+  before.
+
+- **Compact saving.** Every saved file is written compactly without losing anything. Text, links, form fields,
+  bookmarks and images stay exactly as they are.
+
+- **Save Reduced.** File › Save Reduced (⌥⌘S) also reduces images to 150 dpi and stores them as JPEG. This helps
+  most with scans and photos. The app tells you the size before and after. Black-and-white scans and images that
+  would not get smaller stay unchanged.
+
 ### Annotate
 
 Highlights, notes, drawings, form filling and signatures are planned for later versions. See [Roadmap](#roadmap).
@@ -71,11 +85,10 @@ German and English user interface.
 
 Planned after version 1, roughly in this order:
 
-1. Text recognition for scanned PDFs, so you can search and select their text; smaller files through compression
-2. Highlights, notes, drawings and text boxes; filling in PDF forms; signatures as an image
-3. Editing existing text and replacing images in a limited way; true redaction that removes the content; version
+1. Highlights, notes, drawings and text boxes; filling in PDF forms; signatures as an image
+2. Editing existing text and replacing images in a limited way; true redaction that removes the content; version
    history
-4. Optional AI help: split suggestions, file names, questions about a document
+3. Optional AI help: split suggestions, file names, questions about a document
 
 ## What PDF to me does not do
 
@@ -121,7 +134,10 @@ There is no automatic updater. New versions are published on GitHub Releases; ch
 
 ## Privacy and security
 
-- **No network connections.** Version 1 does not connect to the internet.
+- **No network connections.** The app does not connect to the internet.
+
+- **Text recognition on your Mac.** Recognized text stays in memory until you save and is written only into the
+  new file.
 
 - **No copies of your documents.** The data for crash recovery contains references to your files and the list of
   your changes, not the content of your documents.

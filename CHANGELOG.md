@@ -6,8 +6,14 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-19
+
 ### Added
 
+- Text recognition for scanned pages: Pages › Recognize Text, or the toolbar button, makes them searchable and lets
+  you select their text. Recognition runs on your Mac. Only pages without text are processed, and the recognized
+  text is saved as an invisible layer, so the pages look unchanged. Thumbnails mark recognized pages, and the
+  recognition can be cancelled.
 - File › Save Reduced (⌥⌘S) saves a copy with images reduced to 150 dpi as JPEG (quality 75 %) and reports
   the size before and after. One-bit, masked, CMYK and palette images stay unchanged, and an image is only
   replaced when it gets smaller. Text, links, form fields, bookmarks and recognized text are kept.
@@ -17,6 +23,10 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 - Saved files are written more compactly without losing anything: objects are packed into compressed object
   streams, streams are recompressed, and fonts or images that no page uses are left out. Text, links, form fields,
   bookmarks and images stay exactly as they were.
+
+### Fixed
+
+- A page that appears more than once in a document no longer takes over the rotation of its first copy when saved.
 
 ### Internal
 
@@ -57,5 +67,6 @@ First public version.
 - Community build: ad hoc signed, not notarized, published as a zip file with a SHA-256 checksum.
 - German and English user interface.
 
-[Unreleased]: https://github.com/Hank1210/pdf-to-me/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Hank1210/pdf-to-me/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Hank1210/pdf-to-me/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Hank1210/pdf-to-me/releases/tag/v1.0.0

@@ -5,7 +5,7 @@ operated by the developers.
 
 ## No network connections
 
-Version 1 does not connect to the internet. It does not check for updates, does not send crash reports and does not
+The app does not connect to the internet. It does not check for updates, does not send crash reports and does not
 load anything from the web. Links in a PDF are opened by your default browser only when you click them.
 
 ## Your documents
@@ -16,6 +16,12 @@ load anything from the web. Links in a PDF are opened by your default browser on
 - **Failed checks.** If a new file fails the check before saving, it is not placed in the destination folder. It can
   remain in a temporary folder of macOS for diagnosis, which macOS cleans up automatically. If the file would contain
   pages from a password-protected PDF without a password, it is deleted immediately.
+
+## Text recognition
+
+Text recognition runs on your Mac with Apple's Vision framework; nothing is sent anywhere. The recognized text is
+kept in memory only while the document is open and is written only into the new file when you save. It is not
+stored in the crash recovery data or in the log. After a crash, the marked pages are recognized again.
 
 ## Passwords
 

@@ -11,11 +11,11 @@ Voraussetzung: ein Mac mit macOS 14 oder neuer, mit Apple Silicon oder Intel.
 
 1. Laden Sie aus demselben [GitHub Release](https://github.com/Hank1210/pdf-to-me/releases) die ZIP-Datei
    `PDF-to-me-<Version>-Community-macOS.zip` und die gleichnamige `.sha256`-Datei.
-2. Öffnen Sie das Terminal, wechseln Sie in den Download-Ordner und prüfen Sie das Archiv, zum Beispiel für 1.0.0:
+2. Öffnen Sie das Terminal, wechseln Sie in den Download-Ordner und prüfen Sie das Archiv, zum Beispiel für 1.1.0:
 
    ```sh
    cd ~/Downloads
-   shasum -a 256 -c PDF-to-me-1.0.0-Community-macOS.zip.sha256
+   shasum -a 256 -c PDF-to-me-1.1.0-Community-macOS.zip.sha256
    ```
 
 3. Das Terminal muss `OK` melden. Installieren Sie die App nicht, wenn die Prüfung fehlschlägt.
