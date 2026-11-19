@@ -16,6 +16,8 @@
 #include <qpdf/Pl_Discard.hh>
 #include <qpdf/Pl_Flate.hh>
 
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <map>
@@ -88,6 +90,9 @@ struct QKComposer {
     std::vector<std::unique_ptr<Source>> sources;
     std::vector<std::unique_ptr<Overlay>> overlays;
     std::vector<PageSpec> pages;
+    QKImageTarget imageTarget = nullptr;
+    QKImageEncode imageEncode = nullptr;
+    void *imageContext = nullptr;
 };
 
 namespace {
@@ -147,6 +152,84 @@ void removeUnusedResources(QPDF &pdf) {
         } catch (std::exception &) {
             // Inhalt nicht lesbar: Ressourcen lieber behalten.
         }
+    }
+}
+
+/// Komponenten eines Farbraums: 1 (Grau), 3 (RGB) oder 0 (alles andere, wird nicht verkleinert).
+int colorComponents(QPDFObjectHandle space) {
+    if (space.isName()) {
+        auto name = space.getName();
+        if (name == "/DeviceGray" || name == "/G") return 1;
+        if (name == "/DeviceRGB" || name == "/RGB") return 3;
+        return 0;
+    }
+    if (!space.isArray() || space.getArrayNItems() < 2) return 0;
+    auto family = space.getArrayItem(0);
+    if (family.isNameAndEquals("/CalGray")) return 1;
+    if (family.isNameAndEquals("/CalRGB")) return 3;
+    if (family.isNameAndEquals("/ICCBased")) {
+        auto profile = space.getArrayItem(1);
+        if (!profile.isStream()) return 0;
+        auto n = profile.getDict().getKey("/N");
+        if (n.isInteger() && (n.getIntValue() == 1 || n.getIntValue() == 3)) return int(n.getIntValue());
+    }
+    return 0;
+}
+
+/// Verkleinert die Bilder aller Seiten über die Rückrufe des Composers. Jedes Bild wird nur einmal bearbeitet,
+/// gemessen an der größten Seite, auf der es vorkommt.
+void reduceImages(QPDF &pdf, QKComposer &composer) {
+    std::map<QPDFObjGen, std::pair<QPDFObjectHandle, double>> images;
+    for (auto &page : QPDFPageDocumentHelper(pdf).getAllPages()) {
+        auto box = page.getMediaBox(false).getArrayAsRectangle();
+        double side = std::max(std::abs(box.urx - box.llx), std::abs(box.ury - box.lly));
+        page.forEachImage(true, [&](QPDFObjectHandle &object, QPDFObjectHandle &, std::string const &) {
+            auto &entry = images[object.getObjGen()];
+            entry.first = object;
+            entry.second = std::max(entry.second, side);
+        });
+    }
+    for (auto &[id, entry] : images) {
+        auto object = entry.first;
+        auto dict = object.getDict();
+        auto width = dict.getKey("/Width"), height = dict.getKey("/Height"), bits = dict.getKey("/BitsPerComponent");
+        if (!width.isInteger() || !height.isInteger()) continue;
+        QKImageInfo info{};
+        info.width = int(width.getIntValue());
+        info.height = int(height.getIntValue());
+        info.components = colorComponents(dict.getKey("/ColorSpace"));
+        info.bits_per_component = bits.isInteger() ? int(bits.getIntValue()) : 0;
+        info.has_mask = dict.hasKey("/SMask") || dict.hasKey("/Mask") ||
+                        (dict.getKey("/ImageMask").isBool() && dict.getKey("/ImageMask").getBoolValue());
+        info.has_decode = dict.hasKey("/Decode");
+        info.page_long_side = entry.second;
+        int targetWidth = 0, targetHeight = 0;
+        if (!composer.imageTarget(composer.imageContext, &info, &targetWidth, &targetHeight)) continue;
+        if (targetWidth <= 0 || targetHeight <= 0) continue;
+
+        std::shared_ptr<Buffer> pixels;
+        size_t rawSize = 0;
+        try {
+            pixels = object.getStreamData(qpdf_dl_all);
+            rawSize = object.getRawStreamData()->getSize();
+        } catch (std::exception &) {
+            continue;   // z. B. JPEG 2000 oder JBIG2: qpdf dekodiert das nicht, das Bild bleibt.
+        }
+        if (pixels->getSize() != size_t(info.width) * size_t(info.height) * size_t(info.components)) continue;
+
+        unsigned char *jpeg = nullptr;
+        size_t jpegLength = 0;
+        int ok = composer.imageEncode(composer.imageContext, &info, pixels->getBuffer(), pixels->getSize(),
+                                      targetWidth, targetHeight, &jpeg, &jpegLength);
+        std::string data;
+        if (ok && jpeg) data.assign(reinterpret_cast<char *>(jpeg), jpegLength);
+        std::free(jpeg);
+        if (!ok || data.empty() || data.size() >= rawSize) continue;   // nur ersetzen, wenn es kleiner wird
+
+        object.replaceStreamData(data, QPDFObjectHandle::newName("/DCTDecode"), QPDFObjectHandle::newNull());
+        dict.replaceKey("/Width", QPDFObjectHandle::newInteger(targetWidth));
+        dict.replaceKey("/Height", QPDFObjectHandle::newInteger(targetHeight));
+        dict.replaceKey("/BitsPerComponent", QPDFObjectHandle::newInteger(8));
     }
 }
 
@@ -215,6 +298,12 @@ QKStatus qk_add_overlay(QKComposer *composer, const void *bytes, size_t length, 
     } catch (std::exception &exception) {
         return fail(exception, error, error_length);
     }
+}
+
+void qk_set_image_reducer(QKComposer *composer, QKImageTarget target, QKImageEncode encode, void *context) {
+    composer->imageTarget = target;
+    composer->imageEncode = encode;
+    composer->imageContext = context;
 }
 
 void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, int rotation, int overlay) {
@@ -440,7 +529,10 @@ QKStatus qk_write(QKComposer *composer, const char *path, const char *password, 
         //    und Bilder anderer Seiten, mit denen eine Quellseite ihre Ressourcen teilte).
         if (compact) removeUnusedResources(out);
 
-        // 6. Schreiben, auf Wunsch mit Passwort (AES-256, alle Rechte für den Besitzer des Passworts).
+        // 6. Auf Wunsch Bilder verkleinern (verlustbehaftet; Entscheidung und JPEG kommen aus Swift).
+        if (composer->imageTarget && composer->imageEncode) reduceImages(out, *composer);
+
+        // 7. Schreiben, auf Wunsch mit Passwort (AES-256, alle Rechte für den Besitzer des Passworts).
         QPDFWriter writer(out, path);
         if (compact) {
             // Objekt-Streams, Flate auf höchster Stufe auch für schon komprimierte Streams. Bilder in JPEG (DCT)

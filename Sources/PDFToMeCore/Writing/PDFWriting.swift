@@ -23,11 +23,16 @@ public struct WriteOptions: Sendable {
     /// Verlustfrei verkleinern (Objekt-Streams, Neukomprimierung, unbenutzte Ressourcen entfernen). Inhalte, Links,
     /// Formulare und Inhaltsverzeichnis bleiben unverändert; deshalb immer an.
     public var compact: Bool
+    /// Bilder auf höchstens 150 dpi verkleinern und als JPEG speichern (`ImageReduction`). Verlustbehaftet, deshalb
+    /// nur auf ausdrücklichen Wunsch („Verkleinert speichern“).
+    public var reduceImages: Bool
 
-    public init(password: String? = nil, textLayers: TextRecognitionCache? = nil, compact: Bool = true) {
+    public init(password: String? = nil, textLayers: TextRecognitionCache? = nil, compact: Bool = true,
+                reduceImages: Bool = false) {
         self.password = password
         self.textLayers = textLayers
         self.compact = compact
+        self.reduceImages = reduceImages
     }
 }
 

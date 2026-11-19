@@ -3,8 +3,9 @@ import Foundation
 
 /// Dateinamen für gespeicherte Dateien. Nie überschreibend: Ist ein Name vergeben, wird nummeriert.
 public enum FileNaming {
-    /// Die Kennzeichnung bearbeiteter Dateien in beiden Sprachen; beim erneuten Bearbeiten wird sie erkannt.
-    static let editedMarkers = ["bearbeitet", "edited"]
+    /// Die Kennzeichnungen bearbeiteter und verkleinerter Dateien in beiden Sprachen; beim erneuten Bearbeiten werden
+    /// sie erkannt.
+    static let editedMarkers = ["bearbeitet", "edited", "verkleinert", "reduced"]
 
     /// Name ohne Endung für die bearbeitete Fassung, z. B. `Vertrag.pdf` → `Vertrag (bearbeitet)`.
     ///
@@ -14,7 +15,13 @@ public enum FileNaming {
         "\(stem(of: fileName)) (\(loc("bearbeitet", "edited")))"
     }
 
-    /// Name ohne Endung und ohne eine vorhandene Kennzeichnung als bearbeitet (samt Nummer).
+    /// Name ohne Endung für die verkleinerte Fassung, z. B. `Scan.pdf` → `Scan (verkleinert)`. Eine vorhandene
+    /// Kennzeichnung (bearbeitet oder verkleinert) wird ersetzt, nicht verdoppelt.
+    public static func reducedBaseName(forOriginal fileName: String) -> String {
+        "\(stem(of: fileName)) (\(loc("verkleinert", "reduced")))"
+    }
+
+    /// Name ohne Endung und ohne eine vorhandene Kennzeichnung als bearbeitet oder verkleinert (samt Nummer).
     static func stem(of fileName: String) -> String {
         let base = (fileName as NSString).deletingPathExtension
         let markers = editedMarkers.joined(separator: "|")

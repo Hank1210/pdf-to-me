@@ -50,6 +50,36 @@ QKStatus qk_add_overlay(QKComposer *composer, const void *bytes, size_t length, 
 /// Drehung `rotation` dreht Seite und Überlagerung gemeinsam. Der Inhalt der Seite bleibt unverändert.
 void qk_add_page_with_overlay(QKComposer *composer, int source, int page_index, int rotation, int overlay);
 
+/// Eckdaten eines Bildes (Image-XObject) für die Entscheidung, ob es verkleinert wird.
+typedef struct {
+    int width;
+    int height;
+    /// 1 bei Grau (DeviceGray, CalGray, ICCBased mit N 1), 3 bei RGB (DeviceRGB, CalRGB, ICCBased mit N 3),
+    /// 0 bei allen anderen Farbräumen (CMYK, Farbpalette, Lab, Sonderfarben …).
+    int components;
+    int bits_per_component;
+    /// Das Bild hat eine Maske (/SMask, /Mask) oder ist selbst eine (/ImageMask).
+    int has_mask;
+    /// Das Bild hat eigene /Decode-Werte.
+    int has_decode;
+    /// Längere Seite der größten Seite (MediaBox, in Punkt), auf der das Bild vorkommt.
+    double page_long_side;
+} QKImageInfo;
+
+/// Entscheidet, ob ein Bild verkleinert wird: 1 und die Zielgröße in `width`/`height`, sonst 0.
+typedef int (*QKImageTarget)(void *context, const QKImageInfo *info, int *width, int *height);
+
+/// Verkleinert die dekodierten Pixel (8 Bit je Komponente, `info->components` Komponenten, zeilenweise) auf
+/// `width` × `height` und kodiert sie als JPEG. 1 bei Erfolg; `*jpeg` ist dann mit `malloc` angelegt und wird von
+/// der Brücke freigegeben.
+typedef int (*QKImageEncode)(void *context, const QKImageInfo *info, const unsigned char *pixels, size_t length,
+                             int width, int height, unsigned char **jpeg, size_t *jpeg_length);
+
+/// Verkleinert beim Schreiben die Bilder der Seiten: Für jedes Bild (auch in Formular-XObjects, jedes nur einmal)
+/// fragt die Brücke `target`; ersetzt wird es nur, wenn das JPEG aus `encode` kleiner ist als die bisherigen Daten.
+/// Bilder, die sich nicht dekodieren lassen, bleiben unverändert.
+void qk_set_image_reducer(QKComposer *composer, QKImageTarget target, QKImageEncode encode, void *context);
+
 /// Setzt die Seiten zusammen und schreibt die neue Datei nach `path`. `password` (darf NULL sein) schützt sie mit
 /// AES-256. Die Metadaten (Titel, Autor, Thema, Stichwörter) kommen aus der ersten Quelle, als Ersteller steht
 /// `creator`. Mit `compact` ≠ 0 wird die Datei verlustfrei kompakter geschrieben: Objekt-Streams, alle Flate-Streams

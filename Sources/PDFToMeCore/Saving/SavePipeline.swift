@@ -67,6 +67,19 @@ public struct SavePipeline {
         return SaveResult(url: destination, warnings: warnings)
     }
 
+    /// Größe derselben Datei ohne Bildverkleinerung, als Vergleich für „Verkleinert speichern“. Schreibt in einen
+    /// eigenen temporären Ordner und löscht ihn sofort wieder; ungeprüft, weil die Datei nie ans Ziel gelangt.
+    public func unreducedSize(_ plan: DocumentPlan, contents: SourceContents, near directory: URL,
+                              options: WriteOptions) throws -> Int64 {
+        var options = options
+        options.reduceImages = false
+        let temporary = try Self.temporaryURL(near: directory)
+        defer { try? FileManager.default.removeItem(at: temporary.deletingLastPathComponent()) }
+        try writer.compose(plan, contents: contents, to: temporary, options: options)
+        let size = try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber
+        return size?.int64Value ?? 0
+    }
+
     // MARK: Intern
 
     /// Eine Datei in einem eigenen temporären Ordner auf demselben Volume wie `directory`, damit das Verschieben

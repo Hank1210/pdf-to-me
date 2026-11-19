@@ -91,6 +91,10 @@ public struct QPDFKitWriter: PDFWriting {
                 qk_add_page_with_overlay(composer, index, Int32(page.index), Int32(page.rotation.degrees), overlays[key]!)
             }
 
+            if options.reduceImages {
+                qk_set_image_reducer(composer, Self.imageTarget, Self.imageEncode, nil)
+            }
+
             let status = try Self.call { error, length in
                 qk_write(composer, url.path, options.password, AppIdentity.name, options.compact ? 1 : 0, error, length)
             }
@@ -99,6 +103,42 @@ public struct QPDFKitWriter: PDFWriting {
                 throw WriterError.engineFailed(fileName: fileName, reason: status.message)
             }
         }
+    }
+
+    // MARK: Bilder verkleinern
+
+    private static func candidate(_ info: UnsafePointer<QKImageInfo>) -> ImageReduction.Candidate {
+        let info = info.pointee
+        return ImageReduction.Candidate(
+            width: Int(info.width), height: Int(info.height), components: Int(info.components),
+            bitsPerComponent: Int(info.bits_per_component), hasMask: info.has_mask != 0,
+            hasDecode: info.has_decode != 0, pageLongSide: info.page_long_side)
+    }
+
+    /// Rückruf der Brücke: Zielgröße nach `ImageReduction.targetSize`.
+    private static let imageTarget: QKImageTarget = { _, info, width, height in
+        guard let info, let width, let height,
+              let target = ImageReduction.targetSize(for: candidate(info)) else { return 0 }
+        width.pointee = Int32(target.width)
+        height.pointee = Int32(target.height)
+        return 1
+    }
+
+    /// Rückruf der Brücke: skalieren und als JPEG kodieren; der Puffer wird mit `malloc` angelegt, die Brücke gibt
+    /// ihn frei.
+    private static let imageEncode: QKImageEncode = { _, info, pixels, length, width, height, jpeg, jpegLength in
+        guard let info, let pixels, let jpeg, let jpegLength else { return 0 }
+        let image = candidate(info)
+        guard let data = ImageReduction.jpeg(
+            pixels: Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: pixels), count: length,
+                         deallocator: .none), width: image.width, height: image.height,
+            components: image.components, targetWidth: Int(width), targetHeight: Int(height)),
+            let buffer = malloc(data.count)
+        else { return 0 }
+        data.copyBytes(to: buffer.assumingMemoryBound(to: UInt8.self), count: data.count)
+        jpeg.pointee = buffer.assumingMemoryBound(to: UInt8.self)
+        jpegLength.pointee = data.count
+        return 1
     }
 
     /// Ruft eine C-Funktion mit Fehlerpuffer auf.
