@@ -6,6 +6,12 @@ All notable user-facing changes to PDF to me are documented here. The format fol
 
 ## [Unreleased]
 
+### Added
+
+- File › Save Reduced (⌥⌘S) saves a copy with images reduced to 150 dpi as JPEG (quality 75 %) and reports
+  the size before and after. One-bit, masked, CMYK and palette images stay unchanged, and an image is only
+  replaced when it gets smaller. Text, links, form fields, bookmarks and recognized text are kept.
+
 ### Changed
 
 - Saved files are written more compactly without losing anything: objects are packed into compressed object
