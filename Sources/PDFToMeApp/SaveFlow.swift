@@ -86,11 +86,8 @@ enum SaveFlow {
                 let result = try pipeline.save(plan, contents: contents, in: folder, baseName: baseName,
                                                options: options)
                 guard reduceImages else { return (result, nil) }
-                let before = try? pipeline.unreducedSize(plan, contents: contents, near: folder, options: options)
-                let after = (try? FileManager.default.attributesOfItem(atPath: result.url.path)[.size] as? NSNumber)?
-                    .int64Value
-                guard let before, let after else { return (result, nil) }
-                return (result, SizeComparison(before: before, after: after))
+                return (result, pipeline.sizeComparison(plan, contents: contents, saved: result.url,
+                                                        options: options))
             } catch SaveError.cannotWrite {
                 // Ordner nicht beschreibbar: einen anderen wählen lassen.
                 guard let other = chooseFolder(

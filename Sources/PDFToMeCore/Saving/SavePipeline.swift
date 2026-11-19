@@ -67,6 +67,23 @@ public struct SavePipeline {
         return SaveResult(url: destination, warnings: warnings)
     }
 
+    /// Vergleich für die Meldung nach „Verkleinert speichern“: mit dem Original, wenn das passt
+    /// (`SizeComparison.originalSize`), sonst mit derselben Datei ohne Bildverkleinerung. `nil`, wenn sich keine
+    /// Vergleichsgröße ermitteln lässt; gespeichert ist dann trotzdem.
+    public func sizeComparison(_ plan: DocumentPlan, contents: SourceContents, saved: URL,
+                               options: WriteOptions) -> SizeComparison? {
+        guard let after = (try? saved.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) else {
+            return nil
+        }
+        if let original = SizeComparison.originalSize(of: plan) {
+            return SizeComparison(before: original, after: after, reference: .original)
+        }
+        guard let unreduced = try? unreducedSize(plan, contents: contents, near: saved.deletingLastPathComponent(),
+                                                 options: options)
+        else { return nil }
+        return SizeComparison(before: unreduced, after: after, reference: .unreduced)
+    }
+
     /// Größe derselben Datei ohne Bildverkleinerung, als Vergleich für „Verkleinert speichern“. Schreibt in einen
     /// eigenen temporären Ordner und löscht ihn sofort wieder; ungeprüft, weil die Datei nie ans Ziel gelangt.
     public func unreducedSize(_ plan: DocumentPlan, contents: SourceContents, near directory: URL,

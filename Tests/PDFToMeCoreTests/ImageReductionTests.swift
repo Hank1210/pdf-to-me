@@ -370,15 +370,55 @@ final class ImageReductionTests: XCTestCase {
 
     func testSizeComparisonMessage() {
         Localization.current = .de
-        let big = SizeComparison(before: 12_400_000, after: 2_100_000)
-        XCTAssertEqual(big.savedPercent, 83)
-        XCTAssertTrue(big.message.hasSuffix("(−83 %)."), big.message)
-        let small = SizeComparison(before: 1_000_000, after: 980_000)
+        let big = SizeComparison(before: 18_600_000, after: 13_900_000, reference: .original)
+        XCTAssertEqual(big.savedPercent, 25)
+        XCTAssertTrue(big.message.hasSuffix("(−25 %)."), big.message)
+        XCTAssertFalse(big.message.contains("Ohne"), big.message)
+        let unreduced = SizeComparison(before: 15_900_000, after: 13_900_000, reference: .unreduced)
+        XCTAssertTrue(unreduced.message.hasPrefix("Ohne Bildverkleinerung"), unreduced.message)
+        XCTAssertTrue(unreduced.message.hasSuffix("(−13 %)."), unreduced.message)
+        let small = SizeComparison(before: 1_000_000, after: 980_000, reference: .original)
         XCTAssertFalse(small.isNoticeable)
         XCTAssertTrue(small.message.hasPrefix("Die Datei ließ sich kaum verkleinern"), small.message)
         Localization.current = .en
         XCTAssertTrue(small.message.hasPrefix("The file could hardly be reduced"), small.message)
-        XCTAssertEqual(SizeComparison(before: 100, after: 120).savedPercent, 0)
+        XCTAssertTrue(unreduced.message.hasPrefix("Without reducing images"), unreduced.message)
+        XCTAssertEqual(SizeComparison(before: 100, after: 120, reference: .original).savedPercent, 0)
+    }
+
+    /// Mit dem Original wird nur verglichen, wenn das Dokument genau eine PDF mit allen ihren Seiten ist.
+    func testComparisonUsesTheOriginalOnlyWhenItFits() throws {
+        let url = try corpus.pdf(named: "Drei", pages: 3)
+        let original = try XCTUnwrap((try url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init))
+        let (plan, contents) = try load(url)
+        let pipeline = SavePipeline(writer: QPDFKitWriter())
+        let options = WriteOptions(reduceImages: true)
+
+        // Ganz, nur umsortiert: Vergleich mit dem Original.
+        var reordered = plan
+        try reordered.move([reordered.pages[2].id], to: 0)
+        let whole = try pipeline.save(reordered, contents: contents, in: saveFolder(), baseName: "Ganz", options: options)
+        let first = try XCTUnwrap(pipeline.sizeComparison(reordered, contents: contents, saved: whole.url,
+                                                          options: options))
+        XCTAssertEqual(first.reference, .original)
+        XCTAssertEqual(first.before, original)
+
+        // Eine Seite gelöscht: Vergleich mit derselben Datei ohne Bildverkleinerung.
+        var shorter = plan
+        try shorter.remove([shorter.pages[1].id])
+        let part = try pipeline.save(shorter, contents: contents, in: saveFolder(), baseName: "Teil", options: options)
+        let second = try XCTUnwrap(pipeline.sizeComparison(shorter, contents: contents, saved: part.url,
+                                                           options: options))
+        XCTAssertEqual(second.reference, .unreduced)
+        XCTAssertNotEqual(second.before, original)
+
+        // Eine Seite doppelt oder eine zweite Datei: ebenfalls kein Vergleich mit dem Original.
+        var doubled = plan
+        try doubled.insert([PageRef(source: plan.sources[0].id, index: 0)], at: 3)
+        XCTAssertNil(SizeComparison.originalSize(of: doubled))
+        let (merged, _) = try load(url, corpus.pdf(named: "Zwei", pages: 2))
+        XCTAssertNil(SizeComparison.originalSize(of: merged))
+        XCTAssertEqual(SizeComparison.originalSize(of: plan), original)
     }
 
     func testReducedFileName() {
