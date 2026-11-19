@@ -47,6 +47,21 @@ final class TextRecognitionRunTests: XCTestCase {
         XCTAssertFalse(document.plan.pages.contains { $0.recognizesText })
     }
 
+    /// Abbrechen nimmt die Vormerkung der Seiten dieses Durchlaufs zurück; fertige Ergebnisse bleiben.
+    func testStopTextRecognitionKeepsResults() throws {
+        let document = try open(corpus.scannedTextPDF(named: "Scan", pages: [["Eins"], ["Zwei"], ["Drei"]]))
+        let run = try document.markedForTextRecognition(document.plan.pages.map(\.id))
+        XCTAssertEqual(run.count, 3)
+        document.recognitionCache[document.pendingRecognition[0].key] = RecognizedPage(lines: [])
+        try document.change { try $0.remove([run[2]]) }   // während der Erkennung gelöscht
+        try document.stopTextRecognition(run)
+        XCTAssertFalse(document.plan.pages.contains { $0.recognizesText })
+        XCTAssertEqual(document.recognitionCache.count, 1)
+        // Neu gestartet: Die erste Seite ist sofort fertig.
+        try document.markForTextRecognition(document.plan.pages.map(\.id))
+        XCTAssertEqual(document.pendingRecognition.map(\.key.pageIndex), [1])
+    }
+
     func testImagePagesHaveNoText() throws {
         let document = try open(corpus.textImageFile(named: "Beleg", lines: ["Beleg"], size: CGSize(width: 600, height: 800)))
         XCTAssertEqual(try document.markForTextRecognition(document.plan.pages.map(\.id)), 1)

@@ -144,6 +144,15 @@ public struct DocumentPlan: Identifiable, Hashable, Sendable {
         try perform(.recognizeText(ids: positions.map { pages[$0].id }))
     }
 
+    /// Nimmt die Vormerkung zurück, z. B. wenn die Erkennung abgebrochen wird. Nur vorgemerkte Seiten zählen;
+    /// ändert sich nichts, entsteht keine Operation. Ein eigener Schritt statt eines stillen Undo, weil inzwischen
+    /// andere Änderungen dazugekommen sein können.
+    public mutating func stopRecognizingText(_ ids: [PageRef.ID]) throws {
+        let positions = try sortedPositions(of: ids).filter { pages[$0].recognizesText }
+        guard !positions.isEmpty else { return }
+        try perform(.stopRecognizingText(ids: positions.map { pages[$0].id }))
+    }
+
     // MARK: Undo und Redo
 
     public var canUndo: Bool { !undoStack.isEmpty }

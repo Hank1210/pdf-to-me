@@ -12,6 +12,7 @@ protocol PageCommands: AnyObject {
     func deletePages(_ ids: [PageRef.ID])
     func extractPages(_ ids: [PageRef.ID])
     func printPages(_ ids: [PageRef.ID])
+    func cancelTextRecognition()
 }
 
 /// Zustand eines Dokumentfensters für die Ansichten. Die Logik liegt im Core (`WorkingDocument`, `DocumentSearch`);
@@ -37,6 +38,10 @@ final class DocumentViewModel {
     /// Farbmarker nur, wenn Seiten aus mehr als einer Quelle stammen.
     private(set) var showsSourceMarkers = false
     private(set) var currentPageIndex = 0
+    /// Je Seite: bekommt sie beim Speichern eine Textebene? Für das Symbol an der Miniatur.
+    private(set) var recognizesText: [Bool] = []
+    /// Fortschritt der laufenden Texterkennung, sonst `nil`.
+    var recognitionProgress: (done: Int, total: Int)?
     /// Ausgewählte Miniaturen. Folgt beim Blättern der aktuellen Seite, solange nicht mehrere ausgewählt sind.
     var selectedPages: Set<PageRef.ID> = []
 
@@ -72,6 +77,7 @@ final class DocumentViewModel {
             return (index, plan.source(of: page)?.displayName ?? "")
         }
         showsSourceMarkers = plan.sourcesInUse.count > 1
+        recognizesText = plan.pages.map(\.recognizesText)
         outline = OutlineEntry.entries(of: document)
         selectedPages.formIntersection(pageIDs)
         previewVersion += 1

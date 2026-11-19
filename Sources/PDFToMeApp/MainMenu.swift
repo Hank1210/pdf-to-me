@@ -18,6 +18,8 @@ import PDFToMeCore
     func rotateLeft(_ sender: Any?)
     func rotateRight(_ sender: Any?)
     func printSelectedPages(_ sender: Any?)
+    func recognizeTextInDocument(_ sender: Any?)
+    func recognizeTextOnSelectedPages(_ sender: Any?)
 }
 
 /// Das Hauptmenü, im Code aufgebaut (die App hat keine Nib-Dateien). Alle Texte zweisprachig über `loc`.
@@ -129,6 +131,10 @@ enum MainMenu {
                           #selector(DocumentActions.extractSelectedPages(_:)), "e", [.command, .option]))
         menu.addItem(item(loc("Aufteilen …", "Split…"), #selector(DocumentActions.splitDocument(_:)), "t",
                           [.command, .option]))
+        menu.addItem(.separator())
+        menu.addItem(item(loc("Text erkennen", "Recognize Text"), #selector(DocumentActions.recognizeTextInDocument(_:))))
+        menu.addItem(item(loc("Text auf ausgewählten Seiten erkennen", "Recognize Text on Selected Pages"),
+                          #selector(DocumentActions.recognizeTextOnSelectedPages(_:))))
         return menu
     }
 

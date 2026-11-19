@@ -18,6 +18,8 @@ public enum PlanOperation: Codable, Hashable, Sendable {
     case rotate(ids: [PageRef.ID], by: Rotation)
     /// Seiten eine Textebene aus der Texterkennung geben. Enthält nur Seiten, die vorher keine bekommen sollten.
     case recognizeText(ids: [PageRef.ID])
+    /// Die Vormerkung für die Texterkennung zurücknehmen, z. B. beim Abbrechen. Gegenstück zu `recognizeText`.
+    case stopRecognizingText(ids: [PageRef.ID])
 
     // MARK: Anwenden und Umkehren
 
@@ -57,6 +59,9 @@ public enum PlanOperation: Codable, Hashable, Sendable {
 
         case let .recognizeText(ids):
             try Self.setRecognizesText(ids, from: false, to: true, in: &pages)
+
+        case let .stopRecognizingText(ids):
+            try Self.setRecognizesText(ids, from: true, to: false, in: &pages)
         }
     }
 
@@ -96,6 +101,9 @@ public enum PlanOperation: Codable, Hashable, Sendable {
 
         case let .recognizeText(ids):
             try Self.setRecognizesText(ids, from: true, to: false, in: &pages)
+
+        case let .stopRecognizingText(ids):
+            try Self.setRecognizesText(ids, from: false, to: true, in: &pages)
         }
     }
 
@@ -117,7 +125,7 @@ public enum PlanOperation: Codable, Hashable, Sendable {
     private func checkShape() throws {
         let (count, positions): (Int, [Int])
         switch self {
-        case .insert, .rotate, .recognizeText:
+        case .insert, .rotate, .recognizeText, .stopRecognizingText:
             return
         case let .remove(pages, from):
             (count, positions) = (pages.count, from)

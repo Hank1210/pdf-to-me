@@ -26,6 +26,12 @@ struct SidebarView: View {
             .labelsHidden()
             .padding(8)
 
+            if let progress = model.recognitionProgress {
+                RecognitionBanner(done: progress.done, total: progress.total) {
+                    model.commands?.cancelTextRecognition()
+                }
+            }
+
             Divider()
 
             switch model.sidebarMode {
@@ -35,6 +41,32 @@ struct SidebarView: View {
             }
         }
         .frame(minWidth: 160)
+    }
+}
+
+// MARK: - Texterkennung
+
+/// Fortschritt der Texterkennung über der Seitenleiste, mit „Abbrechen“. Das Dokument bleibt bedienbar.
+private struct RecognitionBanner: View {
+    let done: Int
+    let total: Int
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(loc("Text erkennen: \(done) von \(total) Seiten", "Recognizing text: \(done) of \(total) pages"))
+                    .font(.caption)
+                Spacer(minLength: 4)
+                Button(loc("Abbrechen", "Cancel"), action: cancel)
+                    .controlSize(.small)
+            }
+            ProgressView(value: Double(done), total: Double(max(total, 1)))
+                .progressViewStyle(.linear)
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -112,6 +144,7 @@ private struct ThumbnailRow: View {
                 }
                 .frame(maxWidth: 120, maxHeight: 160)
                 .shadow(radius: 1)
+                .overlay(alignment: .bottomTrailing) { textBadge }
                 Text("\(index + 1)")
                     .font(.caption)
                     .foregroundStyle(isCurrent ? .primary : .secondary)
@@ -128,6 +161,20 @@ private struct ThumbnailRow: View {
         // Erst zeichnen, wenn die Zeile sichtbar wird; neu bei jeder neuen Vorschau.
         .task(id: TaskKey(index: index, version: model.previewVersion)) {
             image = model.page(at: index)?.thumbnail(of: CGSize(width: 240, height: 320), for: .cropBox)
+        }
+    }
+
+    /// Zeigt an, dass die Seite beim Speichern eine Textebene aus der Texterkennung bekommt.
+    @ViewBuilder private var textBadge: some View {
+        if model.recognizesText.indices.contains(index), model.recognizesText[index] {
+            Image(systemName: "text.viewfinder")
+                .font(.caption)
+                .padding(3)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 4))
+                .padding(3)
+                .help(loc("Text erkannt: Die Seite wird beim Speichern durchsuchbar.",
+                          "Text recognized: the page becomes searchable when saved."))
+                .accessibilityLabel(loc("Text erkannt", "Text recognized"))
         }
     }
 

@@ -83,11 +83,23 @@ public final class WorkingDocument {
     /// Gibt die Zahl der neu vorgemerkten Seiten zurück; 0 heißt, alle haben schon Text oder sind vorgemerkt.
     @discardableResult
     public func markForTextRecognition(_ ids: [PageRef.ID]) throws -> Int {
+        try markedForTextRecognition(ids).count
+    }
+
+    /// Wie `markForTextRecognition`, gibt aber die neu vorgemerkten Seiten zurück (zum Abbrechen).
+    public func markedForTextRecognition(_ ids: [PageRef.ID]) throws -> [PageRef.ID] {
         let withoutText = TextRecognitionRun.pagesWithoutText(ids, plan: plan, contents: contents)
             .filter { plan.page(withID: $0)?.recognizesText == false }
-        guard !withoutText.isEmpty else { return 0 }
+        guard !withoutText.isEmpty else { return [] }
         try change { try $0.recognizeText(withoutText) }
-        return withoutText.count
+        return withoutText
+    }
+
+    /// Nimmt die Vormerkung der Seiten zurück, die noch im Dokument stehen und vorgemerkt sind (Abbrechen).
+    /// Fertige Ergebnisse bleiben im Zwischenspeicher; wird neu gestartet, sind diese Seiten sofort fertig.
+    public func stopTextRecognition(_ ids: [PageRef.ID]) throws {
+        let present = ids.filter { plan.page(withID: $0) != nil }
+        try change { try $0.stopRecognizingText(present) }
     }
 
     /// Vorgemerkte Seiten, deren Text noch nicht erkannt ist (z. B. nach einem Neustart).

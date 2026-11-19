@@ -18,7 +18,7 @@ enum SaveFlow {
         guard let working = document.working else { return false }
         let baseName = FileNaming.editedBaseName(forOriginal: working.displayName)
         guard let result = save(working.plan, contents: working.contents, folder: working.defaultFolder,
-                                baseName: baseName, window: window)
+                                baseName: baseName, textLayers: working.recognitionCache, window: window)
         else { return false }
         document.updateChangeCount(.changeCleared)
         working.discardSession()
@@ -33,7 +33,7 @@ enum SaveFlow {
             let positions = ids.compactMap { working.plan.position(of: $0) }
             let baseName = Splitter.extractBaseName(stem: working.stem, positions: positions)
             if let result = save(plan, contents: working.contents, folder: working.defaultFolder,
-                                 baseName: baseName, window: window) {
+                                 baseName: baseName, textLayers: working.recognitionCache, window: window) {
                 report([result], window: window)
             }
         } catch {
@@ -43,9 +43,10 @@ enum SaveFlow {
 
     /// Teilt das Dokument; jeder Teil wird einzeln gespeichert und das Ergebnis gesammelt gemeldet.
     static func split(_ working: WorkingDocument, into parts: [SplitPart], window: NSWindow) {
-        guard let options = writeOptions(for: working.plan, window: window),
+        guard var options = writeOptions(for: working.plan, window: window),
               let folder = folder(working.defaultFolder, window: window)
         else { return }
+        options.textLayers = working.recognitionCache
         let results = Splitter.save(working.plan, contents: working.contents, parts: parts, in: folder,
                                     stem: working.stem, pipeline: pipeline, options: options)
         var saved: [SaveResult] = []
@@ -68,10 +69,11 @@ enum SaveFlow {
     /// Fragt bei Bedarf nach dem Passwortschutz und dem Ordner, speichert und zeigt Fehler an. `nil` bei Abbruch
     /// oder Fehler.
     private static func save(_ plan: DocumentPlan, contents: SourceContents, folder: URL?, baseName: String,
-                             window: NSWindow) -> SaveResult? {
-        guard let options = writeOptions(for: plan, window: window),
+                             textLayers: TextRecognitionCache, window: NSWindow) -> SaveResult? {
+        guard var options = writeOptions(for: plan, window: window),
               var folder = self.folder(folder, window: window)
         else { return nil }
+        options.textLayers = textLayers
         while true {
             do {
                 return try pipeline.save(plan, contents: contents, in: folder, baseName: baseName, options: options)

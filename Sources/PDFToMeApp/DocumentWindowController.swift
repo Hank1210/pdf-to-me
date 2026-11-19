@@ -42,6 +42,8 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
 
     deinit {
         if let pageObserver { NotificationCenter.default.removeObserver(pageObserver) }
+        // Fenster zu: eine laufende Erkennung nicht weiterrechnen lassen.
+        recognitionTask?.cancel()
     }
 
     // MARK: Aufbau
@@ -90,6 +92,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         static let rotateRight = NSToolbarItem.Identifier("rotateRight")
         static let insert = NSToolbarItem.Identifier("insert")
         static let split = NSToolbarItem.Identifier("split")
+        static let recognize = NSToolbarItem.Identifier("recognize")
         static let save = NSToolbarItem.Identifier("save")
     }
 
@@ -105,7 +108,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.toggleSidebar, .sidebarTrackingSeparator, ItemID.rotateLeft, ItemID.rotateRight, ItemID.insert,
-         ItemID.split, .flexibleSpace, ItemID.zoomOut, ItemID.zoomIn, ItemID.twoPages, .space, ItemID.save,
+         ItemID.split, ItemID.recognize, .flexibleSpace, ItemID.zoomOut, ItemID.zoomIn, ItemID.twoPages, .space, ItemID.save,
          ItemID.search]
     }
 
@@ -135,6 +138,9 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
                           #selector(insertFiles(_:)))
         case ItemID.split:
             return button(identifier, loc("Aufteilen", "Split"), "scissors", #selector(splitDocument(_:)))
+        case ItemID.recognize:
+            return button(identifier, loc("Text erkennen", "Recognize Text"), "text.viewfinder",
+                          #selector(recognizeTextInDocument(_:)))
         case ItemID.save:
             return button(identifier, loc("Als Kopie speichern", "Save as Copy"), "square.and.arrow.down",
                           #selector(saveCopy(_:)))
@@ -170,6 +176,7 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
         case ItemID.zoomIn: return pdfView.canZoomIn
         case ItemID.zoomOut: return pdfView.canZoomOut
         case ItemID.rotateLeft, ItemID.rotateRight, ItemID.split, ItemID.save: return !model.pageIDs.isEmpty
+        case ItemID.recognize: return !model.pageIDs.isEmpty && recognitionTask == nil
         default: return true
         }
     }
@@ -253,10 +260,14 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
 
     func saveCopy(_ sender: Any?) {
         guard let pdfDocument, let window else { return }
-        SaveFlow.saveCopy(of: pdfDocument, window: window)
+        afterRecognition { SaveFlow.saveCopy(of: pdfDocument, window: window) }
     }
 
     func splitDocument(_ sender: Any?) {
+        afterRecognition { [weak self] in self?.showSplitSheet() }
+    }
+
+    private func showSplitSheet() {
         guard let window, let working = pdfDocument?.working else { return }
         var sheet: NSViewController?
         let view = SplitSheet(
@@ -301,7 +312,84 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
 
     func extractPages(_ ids: [PageRef.ID]) {
         guard let window, let working = pdfDocument?.working, !ids.isEmpty else { return }
-        SaveFlow.extract(ids, of: working, window: window)
+        afterRecognition { SaveFlow.extract(ids, of: working, window: window) }
+    }
+
+    // MARK: Texterkennung
+
+    /// Die laufende Erkennung; es läuft immer höchstens eine je Fenster.
+    private var recognitionTask: Task<Void, Never>?
+
+    func recognizeTextInDocument(_ sender: Any?) { recognizeText(model.pageIDs) }
+    func recognizeTextOnSelectedPages(_ sender: Any?) { recognizeText(model.targetPageIDs) }
+
+    /// Merkt Seiten ohne Text vor (ein Undo-Schritt) und erkennt sie sofort im Hintergrund.
+    func recognizeText(_ ids: [PageRef.ID]) {
+        guard let pdfDocument, let working = pdfDocument.working, recognitionTask == nil, !ids.isEmpty else { return }
+        var marked: [PageRef.ID] = []
+        pdfDocument.perform(loc("Text erkennen", "Recognize Text")) { marked = try $0.markedForTextRecognition(ids) }
+        guard !marked.isEmpty || !working.pendingRecognition.isEmpty else {
+            let alert = NSAlert()
+            alert.messageText = ids.count == model.pageIDs.count
+                ? loc("Alle Seiten haben schon Text.", "All pages already have text.")
+                : loc("Die ausgewählten Seiten haben schon Text.", "The selected pages already have text.")
+            alert.informativeText = loc("Texterkennung ist nur für gescannte Seiten ohne Text nötig.",
+                                        "Text recognition is only needed for scanned pages without text.")
+            if let window { alert.beginSheetModal(for: window) }
+            return
+        }
+        runRecognition(cancelling: marked, then: nil)
+    }
+
+    func cancelTextRecognition() {
+        recognitionTask?.cancel()
+    }
+
+    /// Führt `action` aus, sobald alle vorgemerkten Seiten erkannt sind; erkennt fehlende vorher (z. B. nach einem
+    /// Neustart). Bei Abbruch oder Fehler entfällt `action`.
+    private func afterRecognition(_ action: @escaping () -> Void) {
+        guard let working = pdfDocument?.working, recognitionTask == nil else {
+            if recognitionTask != nil { NSSound.beep() }
+            return
+        }
+        if working.pendingRecognition.isEmpty { action() } else { runRecognition(cancelling: [], then: action) }
+    }
+
+    /// `cancelling`: Seiten, deren Vormerkung beim Abbrechen zurückgenommen wird (die dieses Durchlaufs).
+    private func runRecognition(cancelling marked: [PageRef.ID], then action: (() -> Void)?) {
+        guard let pdfDocument, let working = pdfDocument.working else { return }
+        let jobs = working.pendingRecognition
+        guard !jobs.isEmpty else {
+            action?()
+            return
+        }
+        let cache = working.recognitionCache
+        model.recognitionProgress = (0, jobs.count)
+        recognitionTask = Task { [weak self] in
+            var failure: Error?
+            do {
+                try await TextRecognitionRun.run(jobs, cache: cache) { done, total in
+                    await MainActor.run { self?.model.recognitionProgress = (done, total) }
+                }
+            } catch {
+                failure = error
+            }
+            guard let self else { return }
+            self.recognitionTask = nil
+            self.model.recognitionProgress = nil
+            switch failure {
+            case nil:
+                action?()
+            case is CancellationError:
+                if !marked.isEmpty {
+                    pdfDocument.perform(loc("Texterkennung abbrechen", "Cancel Text Recognition")) {
+                        try $0.stopTextRecognition(marked)
+                    }
+                }
+            case let error?:
+                pdfDocument.presentErrorSheet(error)
+            }
+        }
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
@@ -312,6 +400,8 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSS
             return hasPages
         case #selector(saveCopy(_:)), #selector(splitDocument(_:)):
             return hasPages
+        case #selector(recognizeTextInDocument(_:)), #selector(recognizeTextOnSelectedPages(_:)):
+            return hasPages && recognitionTask == nil
         case #selector(toggleTwoPages(_:)):
             menuItem.state = pdfView.displayMode == .twoUpContinuous ? .on : .off
         case #selector(showThumbnails(_:)):

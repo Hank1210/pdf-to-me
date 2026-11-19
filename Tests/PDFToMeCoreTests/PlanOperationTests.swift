@@ -170,9 +170,11 @@ final class PlanOperationTests: XCTestCase {
         for _ in 0..<300 {
             let count = plan.pages.count
             let selection = plan.pages.filter { _ in Bool.random(using: &generator) }.map(\.id)
-            switch Int.random(in: 0..<5, using: &generator) {
+            switch Int.random(in: 0..<6, using: &generator) {
             case 4:
                 try plan.recognizeText(Array(selection.prefix(3)))
+            case 5:
+                try plan.stopRecognizingText(Array(selection.prefix(2)))
             case 0:
                 let page = PageRef(source: source.id, index: Int.random(in: 0..<5, using: &generator))
                 try plan.insert([page], at: Int.random(in: 0...count, using: &generator))
@@ -235,6 +237,21 @@ final class PlanOperationTests: XCTestCase {
         let part = try plan.extracting([marked, plan.pages[1].id])
         XCTAssertEqual(part.pages.map(\.recognizesText), [true, false])
         XCTAssertEqual(part.pages[0].rotation, .quarter)
+    }
+
+    /// Abbrechen ist ein eigener Schritt; er zählt nur vorgemerkte Seiten und lässt sich rückgängig machen.
+    func testStopRecognizingText() throws {
+        try plan.recognizeText(ids(1, 2))
+        try plan.rotate(ids(0), by: .quarter)       // inzwischen eine andere Änderung
+        try plan.stopRecognizingText(ids(1, 2, 3))
+        XCTAssertEqual(plan.undoStack.last, .stopRecognizingText(ids: ids(1, 2)))
+        XCTAssertFalse(plan.pages.contains { $0.recognizesText })
+        XCTAssertEqual(plan.pages[0].rotation, .quarter)
+        try plan.undo()
+        XCTAssertEqual(plan.pages.map(\.recognizesText), [false, true, true, false, false])
+        let steps = plan.undoStack.count
+        try plan.stopRecognizingText(ids(0, 3))
+        XCTAssertEqual(plan.undoStack.count, steps)
     }
 
     /// Eine gesicherte Operation, die nicht mehr zum Plan passt, wird abgelehnt.
