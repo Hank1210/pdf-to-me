@@ -1,3 +1,4 @@
+import DocKit
 import PDFKit
 import XCTest
 @testable import PDFToMeCore
@@ -49,6 +50,33 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(fileMode, 0o600)
         let folderMode = try FileManager.default.attributesOfItem(atPath: store.directory.path)[.posixPermissions]
         XCTAssertEqual(folderMode as? Int, 0o700)
+    }
+
+    /// Gesichert wird nur, welche Seiten Text bekommen sollen, nie der erkannte Text selbst.
+    func testRecognizedTextIsNeverSaved() throws {
+        var plan = try samplePlan()
+        try plan.recognizeText([plan.pages[1].id])
+        let cache = TextRecognitionCache()
+        let key = TextRecognitionCache.Key(source: plan.sources[0], page: plan.pages[1])
+        cache[key] = RecognizedPage(lines: [RecognizedLine(text: "Kontostand 4711", box: .zero)])
+        try store.save(plan)
+        let data = try Data(contentsOf: store.url(for: plan.id))
+        XCTAssertNil(data.range(of: Data("Kontostand".utf8)))
+        XCTAssertEqual(try store.load(plan.id).pages.map(\.recognizesText), [false, true, false])
+    }
+
+    /// Sitzungsdateien von Version 1.0 haben das Feld `recognizesText` noch nicht.
+    func testSessionFromVersion1Loads() throws {
+        let plan = try samplePlan()
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as! [String: Any]
+        json["pages"] = (json["pages"] as! [[String: Any]]).map { page in
+            var page = page
+            page.removeValue(forKey: "recognizesText")
+            return page
+        }
+        let loaded = try JSONDecoder().decode(DocumentPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(loaded.pages.map(\.recognizesText), [false, false, false])
+        XCTAssertEqual(loaded.pages.map(\.rotation), plan.pages.map(\.rotation))
     }
 
     func testSaveReplacesPreviousVersion() throws {

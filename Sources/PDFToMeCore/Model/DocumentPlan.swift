@@ -135,6 +135,15 @@ public struct DocumentPlan: Identifiable, Hashable, Sendable {
         try perform(.rotate(ids: positions.map { pages[$0].id }, by: rotation))
     }
 
+    /// Merkt Seiten für die Texterkennung vor. Seiten, die schon vorgemerkt sind, zählen nicht; ändert sich
+    /// nichts, entsteht keine Operation. Ob eine Seite schon eine Textebene hat, prüft der Aufrufer: Der Plan
+    /// kennt den Inhalt der Seiten nicht.
+    public mutating func recognizeText(_ ids: [PageRef.ID]) throws {
+        let positions = try sortedPositions(of: ids).filter { !pages[$0].recognizesText }
+        guard !positions.isEmpty else { return }
+        try perform(.recognizeText(ids: positions.map { pages[$0].id }))
+    }
+
     // MARK: Undo und Redo
 
     public var canUndo: Bool { !undoStack.isEmpty }
@@ -164,13 +173,14 @@ public struct DocumentPlan: Identifiable, Hashable, Sendable {
 
     // MARK: Extrahieren
 
-    /// Ein neuer Plan mit den gewählten Seiten in ihrer Reihenfolge in diesem Plan, mit Drehung. Er enthält nur die
+    /// Ein neuer Plan mit den gewählten Seiten in ihrer Reihenfolge in diesem Plan, mit Drehung und vorgemerkter
+    /// Texterkennung. Er enthält nur die
     /// Quellen, die er braucht, neue Seitenkennungen und keinen Verlauf. Grundlage für Extrahieren und Teilen.
     public func extracting(_ ids: [PageRef.ID]) throws -> DocumentPlan {
         let positions = try sortedPositions(of: ids)
         guard !positions.isEmpty else { throw DocumentPlanError.emptySelection }
         let newPages = positions.map { pages[$0] }.map {
-            PageRef(source: $0.source, index: $0.index, rotation: $0.rotation)
+            PageRef(source: $0.source, index: $0.index, rotation: $0.rotation, recognizesText: $0.recognizesText)
         }
         let usedSources = Set(newPages.map(\.source))
         return try DocumentPlan(sources: sources.filter { usedSources.contains($0.id) }, pages: newPages)

@@ -170,7 +170,9 @@ final class PlanOperationTests: XCTestCase {
         for _ in 0..<300 {
             let count = plan.pages.count
             let selection = plan.pages.filter { _ in Bool.random(using: &generator) }.map(\.id)
-            switch Int.random(in: 0..<4, using: &generator) {
+            switch Int.random(in: 0..<5, using: &generator) {
+            case 4:
+                try plan.recognizeText(Array(selection.prefix(3)))
             case 0:
                 let page = PageRef(source: source.id, index: Int.random(in: 0..<5, using: &generator))
                 try plan.insert([page], at: Int.random(in: 0...count, using: &generator))
@@ -193,6 +195,59 @@ final class PlanOperationTests: XCTestCase {
         while plan.canRedo { try plan.redo() }
         XCTAssertEqual(plan.pages, end.pages)
         XCTAssertEqual(plan.undoStack, end.undoStack)
+    }
+
+    // MARK: Texterkennung vormerken
+
+    func testRecognizeTextAndUndo() throws {
+        try plan.recognizeText(ids(1, 3))
+        XCTAssertEqual(plan.pages.map(\.recognizesText), [false, true, false, true, false])
+        try plan.undo()
+        XCTAssertFalse(plan.pages.contains { $0.recognizesText })
+        try plan.redo()
+        XCTAssertEqual(plan.pages.map(\.recognizesText), [false, true, false, true, false])
+    }
+
+    /// Schon vorgemerkte Seiten zählen nicht; ändert sich nichts, gibt es keinen Undo-Schritt.
+    func testRecognizeTextSkipsMarkedPages() throws {
+        try plan.recognizeText(ids(1))
+        try plan.recognizeText(ids(1, 2, 2))
+        XCTAssertEqual(plan.undoStack.last, .recognizeText(ids: ids(2)))
+        let steps = plan.undoStack.count
+        try plan.recognizeText(ids(1, 2))
+        try plan.recognizeText([])
+        XCTAssertEqual(plan.undoStack.count, steps)
+    }
+
+    func testRecognizeTextRejectsUnknownPage() {
+        let before = plan!
+        XCTAssertThrowsError(try plan.recognizeText([UUID()]))
+        XCTAssertEqual(plan, before)
+    }
+
+    /// Das Merkmal gehört zur Seite: Es wandert beim Verschieben mit, bleibt beim Drehen und beim Extrahieren.
+    func testRecognizeTextFollowsThePage() throws {
+        try plan.recognizeText(ids(4))
+        let marked = plan.pages[4].id
+        try plan.move([marked], to: 0)
+        try plan.rotate([marked], by: .quarter)
+        XCTAssertTrue(plan.pages[0].recognizesText)
+        let part = try plan.extracting([marked, plan.pages[1].id])
+        XCTAssertEqual(part.pages.map(\.recognizesText), [true, false])
+        XCTAssertEqual(part.pages[0].rotation, .quarter)
+    }
+
+    /// Eine gesicherte Operation, die nicht mehr zum Plan passt, wird abgelehnt.
+    func testRecognizeTextHistoryMismatch() throws {
+        try plan.recognizeText(ids(0))
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as! [String: Any]
+        var pages = json["pages"] as! [[String: Any]]
+        pages[0]["recognizesText"] = false
+        json["pages"] = pages
+        var damaged = try JSONDecoder().decode(DocumentPlan.self, from: JSONSerialization.data(withJSONObject: json))
+        let before = damaged
+        XCTAssertThrowsError(try damaged.undo()) { XCTAssertEqual($0 as? DocumentPlanError, .historyMismatch) }
+        XCTAssertEqual(damaged, before)
     }
 
     // MARK: Sitzung

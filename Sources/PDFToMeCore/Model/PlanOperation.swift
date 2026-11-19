@@ -3,7 +3,8 @@ import Foundation
 /// Eine umkehrbare Änderung an einem `DocumentPlan`.
 ///
 /// Jede Operation enthält genug Daten, um sie rückgängig zu machen, ohne den Ausgangszustand neu zu berechnen.
-/// Operationen entstehen nur über die Methoden von `DocumentPlan` (`insert`, `remove`, `move`, `rotate`), damit
+/// Operationen entstehen nur über die Methoden von `DocumentPlan` (`insert`, `remove`, `move`, `rotate`,
+/// `recognizeText`), damit
 /// ihre Daten zum Plan passen. Sie liegen in den Undo- und Redo-Stapeln und werden mit der Sitzung gesichert.
 public enum PlanOperation: Codable, Hashable, Sendable {
     /// Seiten an `position` einfügen; `addedSources` sind dabei neu hinzugekommene Quellen (Zusammenführen).
@@ -15,6 +16,8 @@ public enum PlanOperation: Codable, Hashable, Sendable {
     case move(ids: [PageRef.ID], from: [Int], to: Int)
     /// Seiten im Uhrzeigersinn drehen.
     case rotate(ids: [PageRef.ID], by: Rotation)
+    /// Seiten eine Textebene aus der Texterkennung geben. Enthält nur Seiten, die vorher keine bekommen sollten.
+    case recognizeText(ids: [PageRef.ID])
 
     // MARK: Anwenden und Umkehren
 
@@ -51,6 +54,9 @@ public enum PlanOperation: Codable, Hashable, Sendable {
 
         case let .rotate(ids, rotation):
             try Self.rotate(ids, by: rotation, in: &pages)
+
+        case let .recognizeText(ids):
+            try Self.setRecognizesText(ids, from: false, to: true, in: &pages)
         }
     }
 
@@ -87,6 +93,9 @@ public enum PlanOperation: Codable, Hashable, Sendable {
 
         case let .rotate(ids, rotation):
             try Self.rotate(ids, by: rotation.inverse, in: &pages)
+
+        case let .recognizeText(ids):
+            try Self.setRecognizesText(ids, from: true, to: false, in: &pages)
         }
     }
 
@@ -108,7 +117,7 @@ public enum PlanOperation: Codable, Hashable, Sendable {
     private func checkShape() throws {
         let (count, positions): (Int, [Int])
         switch self {
-        case .insert, .rotate:
+        case .insert, .rotate, .recognizeText:
             return
         case let .remove(pages, from):
             (count, positions) = (pages.count, from)
@@ -133,6 +142,19 @@ public enum PlanOperation: Codable, Hashable, Sendable {
                 throw DocumentPlanError.unknownPage(id)
             }
             pages[position].rotation = pages[position].rotation.rotated(by: rotation)
+        }
+    }
+
+    /// Ändert das Merkmal nur, wenn jede Seite den erwarteten Wert hat; sonst passt die Operation nicht zum Plan.
+    private static func setRecognizesText(
+        _ ids: [PageRef.ID], from old: Bool, to new: Bool, in pages: inout [PageRef]
+    ) throws {
+        for id in ids {
+            guard let position = pages.firstIndex(where: { $0.id == id }) else {
+                throw DocumentPlanError.unknownPage(id)
+            }
+            guard pages[position].recognizesText == old else { throw DocumentPlanError.historyMismatch }
+            pages[position].recognizesText = new
         }
     }
 }
